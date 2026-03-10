@@ -1,0 +1,3 @@
+streamvenv/
+.env
+__pycache__/
