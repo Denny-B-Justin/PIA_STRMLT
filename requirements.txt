@@ -5,3 +5,4 @@ databricks-sql-connector
 databricks-sdk
 flask-login
 pandas
+python-dotenv
