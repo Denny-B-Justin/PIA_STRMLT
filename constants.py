@@ -15,7 +15,7 @@ COLOUR_NEW_RING     = "#0EA5E9"   # sky blue ring — new / proposed facilities
 # ── Accessibility baseline ────────────────────────────────────────────────────
 # From notebook 02_transform cell-14:  "Current population with access: X%"
 # Update this value to match your exact cell-14 printout.
-BASELINE_ACCESS_PCT = 65.88
+BASELINE_ACCESS_PCT = 79.31
 
 # ── Slider bounds ─────────────────────────────────────────────────────────────
 MAX_NEW_FACILITIES  = 30
