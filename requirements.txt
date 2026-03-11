@@ -6,3 +6,4 @@ databricks-sdk
 flask-login
 pandas
 python-dotenv
+bcrypt
