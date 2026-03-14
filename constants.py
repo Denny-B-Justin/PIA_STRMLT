@@ -13,8 +13,8 @@ COLOUR_NEW          = "#FFFFFF"   # white fill   — new / proposed facilities
 COLOUR_NEW_RING     = "#0EA5E9"   # sky blue ring — new / proposed facilities
 
 # ── Accessibility baseline ────────────────────────────────────────────────────
-# From notebook 02_transform cell-14:  "Current population with access: X%"
-# Update this value to match your exact cell-14 printout.
+# Matches row 0 of lgu_accessibility_results_zmb.csv (0 new facilities added).
+# Update this value if you regenerate the sample CSVs.
 BASELINE_ACCESS_PCT = 79.31
 
 # ── Slider bounds ─────────────────────────────────────────────────────────────

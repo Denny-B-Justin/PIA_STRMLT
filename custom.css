@@ -1,0 +1,61 @@
+/* ── Slider (rc-slider) overrides ──────────────────────────────────────────── */
+.rc-slider-rail {
+  background: #182236 !important;
+  height: 3px !important;
+}
+.rc-slider-track {
+  background: linear-gradient(90deg, #0EA5E9, #38BDF8) !important;
+  height: 3px !important;
+}
+.rc-slider-handle {
+  border: 2px solid #38BDF8 !important;
+  background: #0C1625 !important;
+  width: 16px !important;
+  height: 16px !important;
+  margin-top: -7px !important;
+  box-shadow: 0 0 8px #38BDF844 !important;
+  opacity: 1 !important;
+}
+.rc-slider-handle:hover,
+.rc-slider-handle:focus,
+.rc-slider-handle-dragging {
+  border-color: #0EA5E9 !important;
+  box-shadow: 0 0 14px #0EA5E988 !important;
+}
+.rc-slider-tooltip-inner {
+  background: #0C1625 !important;
+  border: 1px solid #182236 !important;
+  color: #38BDF8 !important;
+  font-family: 'Space Mono', monospace !important;
+  font-size: 0.72rem !important;
+  padding: 3px 10px !important;
+  border-radius: 6px !important;
+  box-shadow: 0 4px 12px #00000066 !important;
+}
+.rc-slider-tooltip-arrow {
+  border-top-color: #182236 !important;
+}
+.rc-slider-mark-text {
+  color: #3D5068 !important;
+  font-family: 'Space Mono', monospace !important;
+  font-size: 0.68rem !important;
+}
+
+/* ── Global resets ─────────────────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  padding: 0;
+  background-color: #080D1A;
+}
+/* Remove Bootstrap's default card body padding clash */
+.card-body {
+  padding: 0 !important;
+}
+/* Scrollbar styling for dark theme */
+::-webkit-scrollbar        { width: 6px; height: 6px; }
+::-webkit-scrollbar-track  { background: #0C1625; }
+::-webkit-scrollbar-thumb  { background: #182236; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #243450; }

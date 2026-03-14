@@ -1,15 +1,12 @@
+"""
+server.py
+Minimal Flask server for the trial version.
+
+Authentication (flask-login / auth.py) has been removed so the app runs
+without any external service or .env configuration.
+"""
+
 from flask import Flask
-from flask_login import LoginManager
-from auth import User
-import os
 
 server = Flask(__name__)
-server.secret_key = os.getenv("SECRET_KEY")
-
-login_manager = LoginManager()
-login_manager.login_view = "/login"
-login_manager.init_app(server)
-
-@login_manager.user_loader
-def load_user(user_id):
-    return User(user_id)
+server.secret_key = "zambia-health-access-trial-2025"
