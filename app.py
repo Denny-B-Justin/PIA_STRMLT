@@ -66,7 +66,6 @@ FONT_MONO  = "'Space Mono', monospace"
 
 HEADER_H   = 68            # px — controls split viewport height calc
 
-
 # ── Style dictionaries ────────────────────────────────────────────────────────
 
 PAGE_STYLE = {
@@ -80,25 +79,25 @@ PAGE_STYLE = {
 }
 
 HEADER_STYLE = {
-    "backgroundColor": BG_HEADER,
+    "backgroundColor": BG_CARD,
+    "borderBottom": f"1px solid {BORDER}",
     "padding": "0 28px",
     "height": f"{HEADER_H}px",
     "display": "flex",
     "alignItems": "center",
     "justifyContent": "space-between",
     "flexShrink": "0",
-    "borderBottom": "1px solid rgba(255,255,255,0.06)",
 }
 
 BADGE_STYLE = {
     "display": "inline-block",
-    "background": "rgba(249,115,22,0.14)",
-    "border": "1px solid rgba(249,115,22,0.38)",
+    "background": "rgba(249,115,22,0.10)",
+    "border": "1px solid rgba(249,115,22,0.32)",
     "borderRadius": "5px",
     "padding": "2px 8px",
-    "fontFamily": FONT_MONO,
+    "fontFamily": FONT_BODY,
     "fontSize": "0.57rem",
-    "color": "#F97316",
+    "color": "#EA580C",
     "letterSpacing": "1.2px",
     "textTransform": "uppercase",
     "marginBottom": "4px",
@@ -108,12 +107,13 @@ LEGEND_PILL_STYLE = {
     "display": "inline-flex",
     "alignItems": "center",
     "gap": "7px",
-    "background": "rgba(255,255,255,0.07)",
-    "border": "1px solid rgba(255,255,255,0.12)",
+    "background": BG_PAGE,
+    "border": f"1px solid {BORDER}",
     "borderRadius": "99px",
     "padding": "5px 13px",
     "fontSize": "0.78rem",
-    "color": "#94A3B8",
+    "fontWeight": "500",
+    "color": TEXT_MID,
     "whiteSpace": "nowrap",
 }
 
@@ -340,7 +340,7 @@ def legend_dot(color: str, border_color: str | None = None) -> html.Span:
     style = {**LEGEND_DOT_BASE, "backgroundColor": color}
     if border_color:
         style["border"] = f"2px solid {border_color}"
-        style["backgroundColor"] = "transparent"
+        style["backgroundColor"] = BG_PAGE   # matches header background
     return html.Span(style=style)
 
 
@@ -448,12 +448,12 @@ app.layout = html.Div(
                 html.Div([
                     html.Div("TRIAL  ·  CSV DATA MODE", style=BADGE_STYLE),
                     html.Div(
-                        "🇿🇲  Zambia Health Access",
+                        "Zambia Health Access",
                         style={
                             "fontFamily": FONT_BODY,
                             "fontSize": "1.2rem",
                             "fontWeight": "700",
-                            "color": "#F8FAFC",
+                            "color": TEXT_HI,
                             "letterSpacing": "-0.3px",
                             "lineHeight": "1.2",
                         },
@@ -463,7 +463,7 @@ app.layout = html.Div(
                         style={
                             "fontSize": "0.74rem",
                             "fontWeight": "400",
-                            "color": "#475569",
+                            "color": TEXT_MID,
                             "marginTop": "3px",
                         },
                     ),
@@ -496,7 +496,7 @@ app.layout = html.Div(
             },
             children=[
 
-                # ── LEFT: Map ─────────────────────────────────────────────────
+                # ── LEFT: Map ────────────────────────────────────────────────
                 html.Div(
                     style={
                         "flex": "0 0 52%",
@@ -597,145 +597,127 @@ app.layout = html.Div(
                                     children=[
                                         section_title("Optimization Model"),
 
-                                        # ── Field 1: Number of new facilities ─
+                                        # ── Two-column inner layout ───────────
                                         html.Div(
-                                            style={"marginBottom": "14px"},
+                                            style={
+                                                "display": "flex",
+                                                "gap": "20px",
+                                                "alignItems": "flex-start",
+                                            },
                                             children=[
+
+                                                # LEFT COL: steppers + button + stats
                                                 html.Div(
-                                                    "Number of new facilities",
-                                                    style=SLIDER_LABEL_STYLE,
-                                                ),
-                                                html.Div(
-                                                    style=STEPPER_WRAP_STYLE,
+                                                    style={"flex": "0 0 200px"},
                                                     children=[
+
+                                                        # Field 1: Number of new facilities
                                                         html.Div(
-                                                            id="stepper-display",
-                                                            style=STEPPER_VALUE_STYLE,
-                                                            children="0",
-                                                        ),
-                                                        html.Div(
-                                                            style=STEPPER_BTN_GROUP_STYLE,
+                                                            style={"marginBottom": "12px"},
                                                             children=[
-                                                                html.Button(
-                                                                    "+",
-                                                                    id="btn-increase",
-                                                                    n_clicks=0,
-                                                                    style=STEPPER_BTN_STYLE,
+                                                                html.Div(
+                                                                    "Number of new facilities",
+                                                                    style=SLIDER_LABEL_STYLE,
                                                                 ),
                                                                 html.Div(
-                                                                    style={
-                                                                        "height": "1px",
-                                                                        "background": BORDER,
-                                                                        "flexShrink": "0",
-                                                                    }
+                                                                    style=STEPPER_WRAP_STYLE,
+                                                                    children=[
+                                                                        html.Div(
+                                                                            id="stepper-display",
+                                                                            style=STEPPER_VALUE_STYLE,
+                                                                            children="0",
+                                                                        ),
+                                                                        html.Div(
+                                                                            style=STEPPER_BTN_GROUP_STYLE,
+                                                                            children=[
+                                                                                html.Button("+", id="btn-increase",  n_clicks=0, style=STEPPER_BTN_STYLE),
+                                                                                html.Div(style={"height": "1px", "background": BORDER, "flexShrink": "0"}),
+                                                                                html.Button("−", id="btn-decrease",  n_clicks=0, style=STEPPER_BTN_STYLE),
+                                                                            ],
+                                                                        ),
+                                                                    ],
                                                                 ),
-                                                                html.Button(
-                                                                    "−",
-                                                                    id="btn-decrease",
-                                                                    n_clicks=0,
-                                                                    style=STEPPER_BTN_STYLE,
+                                                            ],
+                                                        ),
+
+                                                        # Field 2: Optimized Accessibility %
+                                                        html.Div(
+                                                            style={"marginBottom": "0"},
+                                                            children=[
+                                                                html.Div(
+                                                                    "Optimized Accessibility %",
+                                                                    style=SLIDER_LABEL_STYLE,
+                                                                ),
+                                                                html.Div(
+                                                                    style=STEPPER_WRAP_STYLE,
+                                                                    children=[
+                                                                        html.Div(
+                                                                            id="stepper-access-display",
+                                                                            style={
+                                                                                **STEPPER_VALUE_STYLE,
+                                                                                "color": ACC_INDIGO,
+                                                                                "fontWeight": "600",
+                                                                            },
+                                                                            children="79.31%",
+                                                                        ),
+                                                                        html.Div(
+                                                                            style=STEPPER_BTN_GROUP_STYLE,
+                                                                            children=[
+                                                                                html.Button("+", id="btn-increase-2", n_clicks=0, style=STEPPER_BTN_STYLE),
+                                                                                html.Div(style={"height": "1px", "background": BORDER, "flexShrink": "0"}),
+                                                                                html.Button("−", id="btn-decrease-2", n_clicks=0, style=STEPPER_BTN_STYLE),
+                                                                            ],
+                                                                        ),
+                                                                    ],
+                                                                ),
+                                                            ],
+                                                        ),
+
+                                                        # View locations button
+                                                        html.Button(
+                                                            "View locations",
+                                                            id="btn-view-locations",
+                                                            n_clicks=0,
+                                                            style=VIEW_BTN_STYLE,
+                                                        ),
+
+                                                        # Stats: n_new + access %
+                                                        html.Div(
+                                                            style={"marginTop": "16px"},
+                                                            children=[
+                                                                html.Div(
+                                                                    id="om-n-new",
+                                                                    style={**BIG_NUM_STYLE, "fontSize": "1.65rem"},
+                                                                ),
+                                                                html.Div(
+                                                                    "New facilities added",
+                                                                    style={**BIG_NUM_LABEL_STYLE, "marginBottom": "10px"},
+                                                                ),
+                                                                html.Div(
+                                                                    id="om-access-pct",
+                                                                    style={**BIG_NUM_STYLE, "fontSize": "1.65rem", "color": ACC_INDIGO},
+                                                                ),
+                                                                html.Div(
+                                                                    id="om-delta-label",
+                                                                    style=BIG_NUM_LABEL_STYLE,
                                                                 ),
                                                             ],
                                                         ),
                                                     ],
                                                 ),
-                                            ],
-                                        ),
 
-                                        # ── Field 2: Optimized Accessibility % ─
-                                        html.Div(
-                                            style={"marginBottom": "0"},
-                                            children=[
+                                                # RIGHT COL: accessibility curve
                                                 html.Div(
-                                                    "Optimized Accessibility %",
-                                                    style=SLIDER_LABEL_STYLE,
-                                                ),
-                                                html.Div(
-                                                    style=STEPPER_WRAP_STYLE,
+                                                    style={"flex": "1", "minWidth": "0"},
                                                     children=[
-                                                        html.Div(
-                                                            id="stepper-access-display",
-                                                            style={
-                                                                **STEPPER_VALUE_STYLE,
-                                                                "color": ACC_INDIGO,
-                                                                "fontWeight": "600",
-                                                            },
-                                                            children="79.31%",
-                                                        ),
-                                                        html.Div(
-                                                            style=STEPPER_BTN_GROUP_STYLE,
-                                                            children=[
-                                                                html.Button(
-                                                                    "+",
-                                                                    id="btn-increase-2",
-                                                                    n_clicks=0,
-                                                                    style=STEPPER_BTN_STYLE,
-                                                                ),
-                                                                html.Div(
-                                                                    style={
-                                                                        "height": "1px",
-                                                                        "background": BORDER,
-                                                                        "flexShrink": "0",
-                                                                    }
-                                                                ),
-                                                                html.Button(
-                                                                    "−",
-                                                                    id="btn-decrease-2",
-                                                                    n_clicks=0,
-                                                                    style=STEPPER_BTN_STYLE,
-                                                                ),
-                                                            ],
+                                                        dcc.Graph(
+                                                            id="accessibility-chart",
+                                                            config={"displayModeBar": False},
+                                                            style={"marginLeft": "-8px"},
                                                         ),
                                                     ],
                                                 ),
                                             ],
-                                        ),
-
-                                        # ── View locations button ──────────────
-                                        html.Button(
-                                            "View locations",
-                                            id="btn-view-locations",
-                                            n_clicks=0,
-                                            style=VIEW_BTN_STYLE,
-                                        ),
-
-                                        # Two stats: n_new + access %
-                                        html.Div(
-                                            style={**STAT_PAIR_STYLE,
-                                                   "marginTop": "20px",
-                                                   "marginBottom": "14px"},
-                                            children=[
-                                                html.Div([
-                                                    html.Div(
-                                                        id="om-n-new",
-                                                        style={**BIG_NUM_STYLE,
-                                                               "fontSize": "1.8rem"},
-                                                    ),
-                                                    html.Div(
-                                                        "New facilities added",
-                                                        style=BIG_NUM_LABEL_STYLE,
-                                                    ),
-                                                ]),
-                                                html.Div([
-                                                    html.Div(
-                                                        id="om-access-pct",
-                                                        style={**BIG_NUM_STYLE,
-                                                               "fontSize": "1.8rem",
-                                                               "color": ACC_INDIGO},
-                                                    ),
-                                                    html.Div(
-                                                        id="om-delta-label",
-                                                        style=BIG_NUM_LABEL_STYLE,
-                                                    ),
-                                                ]),
-                                            ],
-                                        ),
-
-                                        # Accessibility curve
-                                        dcc.Graph(
-                                            id="accessibility-chart",
-                                            config={"displayModeBar": False},
-                                            style={"marginLeft": "-10px"},
                                         ),
                                     ],
                                 ),
@@ -872,7 +854,7 @@ def update_dashboard(n_new, existing_records, results_records):
     delta_pct   = round(access_pct - BASELINE_ACCESS_PCT, 2) if n_new > 0 else 0.0
     total_fac   = n_existing + n_new
 
-    # Map
+    # Map n_existing  = 1258
     map_fig = build_map_figure(existing_df, new_df, map_height_px=500)
 
     # Current Accessibility card
