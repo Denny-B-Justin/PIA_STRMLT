@@ -21,58 +21,9 @@ html, body {
 ::-webkit-scrollbar-thumb  { background: #CBD5E1; border-radius: 3px; }
 ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
 
-/* ── rc-slider — light indigo theme ────────────────────────────────────────── */
-
-.rc-slider-rail {
-  background: #E2E8F0 !important;
-  height: 3px !important;
-}
-
-.rc-slider-track {
-  background: linear-gradient(90deg, #4338CA, #4F46E5) !important;
-  height: 3px !important;
-}
-
-.rc-slider-handle {
-  border: 2px solid #4F46E5 !important;
-  background: #FFFFFF !important;
-  width: 16px !important;
-  height: 16px !important;
-  margin-top: -7px !important;
-  box-shadow: 0 0 0 3px rgba(79,70,229,0.15) !important;
-  opacity: 1 !important;
-  transition: box-shadow 0.15s ease !important;
-}
-
-.rc-slider-handle:hover,
-.rc-slider-handle:focus,
-.rc-slider-handle-dragging {
-  border-color: #3730A3 !important;
-  box-shadow: 0 0 0 5px rgba(79,70,229,0.22) !important;
-}
-
-/* Tooltip */
-.rc-slider-tooltip-inner {
-  background: #FFFFFF !important;
-  border: 1px solid #E2E8F0 !important;
-  color: #4F46E5 !important;
-  font-family: 'Inter', sans-serif !important;
-  font-size: 0.75rem !important;
-  font-weight: 600 !important;
-  padding: 3px 10px !important;
-  border-radius: 6px !important;
-  box-shadow: 0 2px 8px rgba(15,23,42,0.08) !important;
-}
-.rc-slider-tooltip-arrow {
-  border-top-color: #E2E8F0 !important;
-}
-
-/* Mark text */
-.rc-slider-mark-text {
-  color: #94A3B8 !important;
-  font-family: 'Inter', sans-serif !important;
-  font-size: 0.67rem !important;
-}
+/* ── +/- stepper button hover ────────────────────────────────────────────────── */
+button:hover  { background: #F1F5F9 !important; color: #4F46E5 !important; }
+button:active { background: #E0E7FF !important; color: #3730A3 !important; }
 
 /* ── Plotly map container ────────────────────────────────────────────────────── */
 /* Ensure the Plotly Graph fills its flex container exactly */

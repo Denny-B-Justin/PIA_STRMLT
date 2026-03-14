@@ -14,7 +14,7 @@ Run:
 import pandas as pd
 import plotly.graph_objects as go
 
-from dash import dcc, html, Dash, Input, Output, no_update
+from dash import dcc, html, Dash, Input, Output, State, no_update
 import dash_bootstrap_components as dbc
 
 from queries import QueryService
@@ -206,6 +206,75 @@ SLIDER_LABEL_STYLE = {
     "marginBottom": "8px",
 }
 
+# ── +/- stepper control ───────────────────────────────────────────────────────
+
+STEPPER_WRAP_STYLE = {
+    "display": "flex",
+    "alignItems": "stretch",
+    "border": f"1px solid {BORDER}",
+    "borderRadius": "8px",
+    "overflow": "hidden",
+    "height": "46px",
+}
+
+STEPPER_VALUE_STYLE = {
+    "flex": "1",
+    "border": "none",
+    "outline": "none",
+    "padding": "0 14px",
+    "fontFamily": FONT_BODY,
+    "fontSize": "1.05rem",
+    "fontWeight": "500",
+    "color": TEXT_HI,
+    "backgroundColor": BG_CARD,
+    "minWidth": "0",
+    "lineHeight": "46px",
+}
+
+STEPPER_BTN_GROUP_STYLE = {
+    "display": "flex",
+    "flexDirection": "column",
+    "borderLeft": f"1px solid {BORDER}",
+    "flexShrink": "0",
+}
+
+STEPPER_BTN_STYLE = {
+    "width": "36px",
+    "flex": "1",
+    "border": "none",
+    "borderRadius": "0",
+    "background": BG_CARD,
+    "color": TEXT_MID,
+    "fontSize": "0.75rem",
+    "fontWeight": "700",
+    "cursor": "pointer",
+    "display": "flex",
+    "alignItems": "center",
+    "justifyContent": "center",
+    "userSelect": "none",
+    "transition": "background 0.12s, color 0.12s",
+    "padding": "0",
+    "lineHeight": "1",
+}
+
+VIEW_BTN_STYLE = {
+    "display": "block",
+    "width": "100%",
+    "padding": "12px 0",
+    "marginTop": "18px",
+    "background": ACC_INDIGO,
+    "color": "#FFFFFF",
+    "border": "none",
+    "borderRadius": "8px",
+    "fontFamily": FONT_BODY,
+    "fontSize": "0.88rem",
+    "fontWeight": "600",
+    "letterSpacing": "0.2px",
+    "cursor": "pointer",
+    "textAlign": "center",
+    "transition": "background 0.15s",
+}
+
 STAT_PAIR_STYLE = {
     "display": "flex",
     "gap": "36px",
@@ -312,7 +381,7 @@ def build_recommended_table(rows: list[dict]) -> html.Div:
     """HTML table for the Recommended Locations card."""
     if not rows:
         return html.Div(
-            "Move the slider above to reveal optimal new facility locations.",
+            "Move the + button above to reveal optimal new facility locations.",
             style={
                 "color": TEXT_LO, "fontSize": "0.82rem",
                 "padding": "20px 0", "textAlign": "center",
@@ -368,6 +437,7 @@ app.layout = html.Div(
         # ── Data stores ───────────────────────────────────────────────────────
         dcc.Store(id="store-existing-facilities"),
         dcc.Store(id="store-accessibility-results"),
+        dcc.Store(id="store-n-new", data=0),   # tracks current stepper value
 
         # ── Header ────────────────────────────────────────────────────────────
         html.Div(
@@ -378,7 +448,7 @@ app.layout = html.Div(
                 html.Div([
                     html.Div("TRIAL  ·  CSV DATA MODE", style=BADGE_STYLE),
                     html.Div(
-                        "Zambia Health Access",
+                        "🇿🇲  Zambia Health Access",
                         style={
                             "fontFamily": FONT_BODY,
                             "fontSize": "1.2rem",
@@ -527,35 +597,112 @@ app.layout = html.Div(
                                     children=[
                                         section_title("Optimization Model"),
 
-                                        # Slider
+                                        # ── Field 1: Number of new facilities ─
                                         html.Div(
-                                            style={"marginBottom": "18px"},
+                                            style={"marginBottom": "14px"},
                                             children=[
                                                 html.Div(
                                                     "Number of new facilities",
                                                     style=SLIDER_LABEL_STYLE,
                                                 ),
-                                                dcc.Slider(
-                                                    id="slider-new-facilities",
-                                                    min=0,
-                                                    max=MAX_NEW_FACILITIES,
-                                                    step=1,
-                                                    value=0,
-                                                    marks={
-                                                        0:  {"label": "0",  "style": {"color": TEXT_LO, "fontSize": "0.67rem"}},
-                                                        10: {"label": "10", "style": {"color": TEXT_LO, "fontSize": "0.67rem"}},
-                                                        20: {"label": "20", "style": {"color": TEXT_LO, "fontSize": "0.67rem"}},
-                                                        30: {"label": "30", "style": {"color": TEXT_LO, "fontSize": "0.67rem"}},
-                                                    },
-                                                    tooltip={"placement": "bottom",
-                                                             "always_visible": True},
+                                                html.Div(
+                                                    style=STEPPER_WRAP_STYLE,
+                                                    children=[
+                                                        html.Div(
+                                                            id="stepper-display",
+                                                            style=STEPPER_VALUE_STYLE,
+                                                            children="0",
+                                                        ),
+                                                        html.Div(
+                                                            style=STEPPER_BTN_GROUP_STYLE,
+                                                            children=[
+                                                                html.Button(
+                                                                    "+",
+                                                                    id="btn-increase",
+                                                                    n_clicks=0,
+                                                                    style=STEPPER_BTN_STYLE,
+                                                                ),
+                                                                html.Div(
+                                                                    style={
+                                                                        "height": "1px",
+                                                                        "background": BORDER,
+                                                                        "flexShrink": "0",
+                                                                    }
+                                                                ),
+                                                                html.Button(
+                                                                    "−",
+                                                                    id="btn-decrease",
+                                                                    n_clicks=0,
+                                                                    style=STEPPER_BTN_STYLE,
+                                                                ),
+                                                            ],
+                                                        ),
+                                                    ],
                                                 ),
                                             ],
+                                        ),
+
+                                        # ── Field 2: Optimized Accessibility % ─
+                                        html.Div(
+                                            style={"marginBottom": "0"},
+                                            children=[
+                                                html.Div(
+                                                    "Optimized Accessibility %",
+                                                    style=SLIDER_LABEL_STYLE,
+                                                ),
+                                                html.Div(
+                                                    style=STEPPER_WRAP_STYLE,
+                                                    children=[
+                                                        html.Div(
+                                                            id="stepper-access-display",
+                                                            style={
+                                                                **STEPPER_VALUE_STYLE,
+                                                                "color": ACC_INDIGO,
+                                                                "fontWeight": "600",
+                                                            },
+                                                            children="79.31%",
+                                                        ),
+                                                        html.Div(
+                                                            style=STEPPER_BTN_GROUP_STYLE,
+                                                            children=[
+                                                                html.Button(
+                                                                    "+",
+                                                                    id="btn-increase-2",
+                                                                    n_clicks=0,
+                                                                    style=STEPPER_BTN_STYLE,
+                                                                ),
+                                                                html.Div(
+                                                                    style={
+                                                                        "height": "1px",
+                                                                        "background": BORDER,
+                                                                        "flexShrink": "0",
+                                                                    }
+                                                                ),
+                                                                html.Button(
+                                                                    "−",
+                                                                    id="btn-decrease-2",
+                                                                    n_clicks=0,
+                                                                    style=STEPPER_BTN_STYLE,
+                                                                ),
+                                                            ],
+                                                        ),
+                                                    ],
+                                                ),
+                                            ],
+                                        ),
+
+                                        # ── View locations button ──────────────
+                                        html.Button(
+                                            "View locations",
+                                            id="btn-view-locations",
+                                            n_clicks=0,
+                                            style=VIEW_BTN_STYLE,
                                         ),
 
                                         # Two stats: n_new + access %
                                         html.Div(
                                             style={**STAT_PAIR_STYLE,
+                                                   "marginTop": "20px",
                                                    "marginBottom": "14px"},
                                             children=[
                                                 html.Div([
@@ -647,6 +794,46 @@ def fetch_accessibility_results_once(data):
 
 
 @app.callback(
+    Output("store-n-new",           "data"),
+    Output("stepper-display",       "children"),
+    Output("stepper-access-display","children"),
+    Input("btn-increase",   "n_clicks"),
+    Input("btn-decrease",   "n_clicks"),
+    Input("btn-increase-2", "n_clicks"),
+    Input("btn-decrease-2", "n_clicks"),
+    State("store-n-new", "data"),
+    State("store-accessibility-results", "data"),
+    State("store-existing-facilities", "data"),
+)
+def update_stepper(inc, dec, inc2, dec2, current, results_records, existing_records):
+    """
+    Handle all four +/- button clicks.
+    Both field-1 (+/-) and field-2 (+/-) step the same n_new counter.
+    The accessibility display in field-2 is read-only and auto-updates.
+    """
+    from dash import ctx
+    triggered = ctx.triggered_id
+
+    n = current if current is not None else 0
+
+    if triggered in ("btn-increase", "btn-increase-2"):
+        n = min(n + 1, MAX_NEW_FACILITIES)
+    elif triggered in ("btn-decrease", "btn-decrease-2"):
+        n = max(n - 1, 0)
+
+    # Compute the access % for the new n
+    if results_records and existing_records:
+        results_df  = pd.DataFrame(results_records)
+        n_existing  = len(pd.DataFrame(existing_records))
+        access_pct  = get_access_pct(results_df, n, n_existing)
+        access_text = f"{access_pct:.2f}%"
+    else:
+        access_text = f"{BASELINE_ACCESS_PCT:.2f}%"
+
+    return n, str(n), access_text
+
+
+@app.callback(
     Output("map-graph",           "figure"),
     Output("ca-total-fac",        "children"),
     Output("ca-access-pct",       "children"),
@@ -655,14 +842,14 @@ def fetch_accessibility_results_once(data):
     Output("om-delta-label",      "children"),
     Output("accessibility-chart", "figure"),
     Output("recommended-table",   "children"),
-    Input("slider-new-facilities", "value"),
+    Input("store-n-new", "data"),
     Input("store-existing-facilities", "data"),
     Input("store-accessibility-results", "data"),
 )
 def update_dashboard(n_new, existing_records, results_records):
     """
     Master callback: rebuilds the map, KPI values, accessibility chart,
-    and recommended locations table whenever the slider or data stores change.
+    and recommended locations table whenever n_new or data stores change.
     """
     if existing_records is None or results_records is None:
         return (
@@ -673,11 +860,13 @@ def update_dashboard(n_new, existing_records, results_records):
             build_recommended_table([]),
         )
 
+    n_new = n_new or 0
+
     existing_df = pd.DataFrame(existing_records)
     results_df  = pd.DataFrame(results_records)
 
     # n_existing  = len(existing_df)
-    n_existing = 1258
+    n_existing  = 1258
     new_df      = get_new_facility_rows(results_df, n_new)
     access_pct  = get_access_pct(results_df, n_new, n_existing)
     delta_pct   = round(access_pct - BASELINE_ACCESS_PCT, 2) if n_new > 0 else 0.0
