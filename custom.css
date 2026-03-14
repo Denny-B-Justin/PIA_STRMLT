@@ -1,61 +1,84 @@
-/* ── Slider (rc-slider) overrides ──────────────────────────────────────────── */
+/* ── Global resets ─────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #F8FAFC;
+  font-family: 'Inter', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Remove default Bootstrap card body padding */
+.card-body { padding: 0 !important; }
+
+/* Thin light scrollbar for the right stats pane */
+::-webkit-scrollbar        { width: 5px; height: 5px; }
+::-webkit-scrollbar-track  { background: #F1F5F9; }
+::-webkit-scrollbar-thumb  { background: #CBD5E1; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+
+/* ── rc-slider — light indigo theme ────────────────────────────────────────── */
+
 .rc-slider-rail {
-  background: #182236 !important;
+  background: #E2E8F0 !important;
   height: 3px !important;
 }
+
 .rc-slider-track {
-  background: linear-gradient(90deg, #0EA5E9, #38BDF8) !important;
+  background: linear-gradient(90deg, #4338CA, #4F46E5) !important;
   height: 3px !important;
 }
+
 .rc-slider-handle {
-  border: 2px solid #38BDF8 !important;
-  background: #0C1625 !important;
+  border: 2px solid #4F46E5 !important;
+  background: #FFFFFF !important;
   width: 16px !important;
   height: 16px !important;
   margin-top: -7px !important;
-  box-shadow: 0 0 8px #38BDF844 !important;
+  box-shadow: 0 0 0 3px rgba(79,70,229,0.15) !important;
   opacity: 1 !important;
+  transition: box-shadow 0.15s ease !important;
 }
+
 .rc-slider-handle:hover,
 .rc-slider-handle:focus,
 .rc-slider-handle-dragging {
-  border-color: #0EA5E9 !important;
-  box-shadow: 0 0 14px #0EA5E988 !important;
-}
-.rc-slider-tooltip-inner {
-  background: #0C1625 !important;
-  border: 1px solid #182236 !important;
-  color: #38BDF8 !important;
-  font-family: 'Space Mono', monospace !important;
-  font-size: 0.72rem !important;
-  padding: 3px 10px !important;
-  border-radius: 6px !important;
-  box-shadow: 0 4px 12px #00000066 !important;
-}
-.rc-slider-tooltip-arrow {
-  border-top-color: #182236 !important;
-}
-.rc-slider-mark-text {
-  color: #3D5068 !important;
-  font-family: 'Space Mono', monospace !important;
-  font-size: 0.68rem !important;
+  border-color: #3730A3 !important;
+  box-shadow: 0 0 0 5px rgba(79,70,229,0.22) !important;
 }
 
-/* ── Global resets ─────────────────────────────────────────────────────────── */
-*, *::before, *::after {
-  box-sizing: border-box;
+/* Tooltip */
+.rc-slider-tooltip-inner {
+  background: #FFFFFF !important;
+  border: 1px solid #E2E8F0 !important;
+  color: #4F46E5 !important;
+  font-family: 'Inter', sans-serif !important;
+  font-size: 0.75rem !important;
+  font-weight: 600 !important;
+  padding: 3px 10px !important;
+  border-radius: 6px !important;
+  box-shadow: 0 2px 8px rgba(15,23,42,0.08) !important;
 }
-body {
-  margin: 0;
-  padding: 0;
-  background-color: #080D1A;
+.rc-slider-tooltip-arrow {
+  border-top-color: #E2E8F0 !important;
 }
-/* Remove Bootstrap's default card body padding clash */
-.card-body {
-  padding: 0 !important;
+
+/* Mark text */
+.rc-slider-mark-text {
+  color: #94A3B8 !important;
+  font-family: 'Inter', sans-serif !important;
+  font-size: 0.67rem !important;
 }
-/* Scrollbar styling for dark theme */
-::-webkit-scrollbar        { width: 6px; height: 6px; }
-::-webkit-scrollbar-track  { background: #0C1625; }
-::-webkit-scrollbar-thumb  { background: #182236; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #243450; }
+
+/* ── Plotly map container ────────────────────────────────────────────────────── */
+/* Ensure the Plotly Graph fills its flex container exactly */
+.js-plotly-plot,
+.plot-container,
+.plotly {
+  width: 100% !important;
+  height: 100% !important;
+}

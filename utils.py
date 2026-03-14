@@ -1,100 +1,133 @@
 """
 utils.py
-Map-building helpers, KPI card HTML, and accessibility calculation utilities.
+Map, chart, and table helpers for the Zambia Health Access dashboard.
 
-Public interface is unchanged from the Databricks version.
+Map approach change:
+  Folium + html.Iframe(srcDoc=...) was replaced with plotly go.Scattermap
+  rendered as a standard dcc.Graph.  Folium/Leaflet relies on external CDN JS
+  that can silently fail inside an iframe srcDoc, leaving a blank white panel.
+  go.Scattermap uses the open-street-map tile style which requires no Mapbox
+  token and renders reliably as a Plotly component inside Dash.
+
+Chart x-axis:
+  X-axis now shows actual total_facilities values from the results table
+  (e.g. 80 → 110) rather than a 0-based new-facility count.
 """
 
-import folium
 import pandas as pd
+import plotly.graph_objects as go
 
 from constants import (
     BASELINE_ACCESS_PCT,
     ZAMBIA_CENTER_LAT,
     ZAMBIA_CENTER_LON,
     MAP_ZOOM,
-    COLOUR_EXISTING,
-    COLOUR_NEW,
-    COLOUR_NEW_RING,
 )
 
+# Zambia 2025 population estimate — used for "new people reached" calculation
+ZAMBIA_POPULATION = 20_500_000
 
-# ── Map helpers ───────────────────────────────────────────────────────────────
 
-def build_folium_map(existing_df: pd.DataFrame, new_df: pd.DataFrame) -> folium.Map:
-    """
-    Build a Folium map with two feature groups:
-      • Orange circle markers  → existing health facilities
-      • White circle markers   → new / proposed health facilities
-    Returns a folium.Map object.
-    """
-    fmap = folium.Map(
-        location=[ZAMBIA_CENTER_LAT, ZAMBIA_CENTER_LON],
-        zoom_start=MAP_ZOOM,
-        tiles="CartoDB dark_matter",
-        control_scale=True,
+# ── DMS conversion ────────────────────────────────────────────────────────────
+
+def _to_dms(decimal_deg: float, is_lat: bool) -> str:
+    """Convert decimal-degree coordinate to DMS string, e.g. 28° 02' 26.67\" E."""
+    direction = (
+        ("N" if decimal_deg >= 0 else "S") if is_lat
+        else ("E" if decimal_deg >= 0 else "W")
     )
+    d       = abs(decimal_deg)
+    deg     = int(d)
+    minutes = (d - deg) * 60
+    min_int = int(minutes)
+    sec     = (minutes - min_int) * 60
+    return f"{deg}° {min_int:02d}' {sec:05.2f}\" {direction}"
+
+
+# ── Map (Plotly Scattermap) ───────────────────────────────────────────────────
+
+def build_map_figure(
+    existing_df: pd.DataFrame,
+    new_df: pd.DataFrame,
+    map_height_px: int = 500,
+) -> go.Figure:
+    """
+    Build a Plotly Scattermap figure with:
+      • Red filled circles  → existing health facilities
+      • Green numbered circles → new / proposed facilities
+
+    Uses open-street-map tiles (no Mapbox token required).
+    Rendered as dcc.Graph — no iframe or external CDN needed.
+    """
+    fig = go.Figure()
 
     # ── Existing facilities ───────────────────────────────────────────────────
-    existing_group = folium.FeatureGroup(name="Existing Facilities", show=True)
-    for _, row in existing_df.iterrows():
-        folium.CircleMarker(
-            location=[row["lat"], row["lon"]],
-            radius=5,
-            color=COLOUR_EXISTING,
-            weight=1.5,
-            fill=True,
-            fill_color=COLOUR_EXISTING,
-            fill_opacity=0.85,
-            tooltip=folium.Tooltip(
-                f"<b>{row.get('name', 'Health Facility')}</b><br>"
-                f"Lat: {row['lat']:.4f} | Lon: {row['lon']:.4f}",
-                sticky=False,
-            ),
-        ).add_to(existing_group)
-    existing_group.add_to(fmap)
+    if not existing_df.empty:
+        hover_text = [
+            f"<b>{row.get('name', 'Health Facility')}</b><br>"
+            f"{row['lat']:.4f}° N, {row['lon']:.4f}° E"
+            for _, row in existing_df.iterrows()
+        ]
+        fig.add_trace(go.Scattermap(
+            lat=existing_df["lat"].tolist(),
+            lon=existing_df["lon"].tolist(),
+            mode="markers",
+            marker=dict(size=7, color="#DC2626", opacity=0.75),
+            text=hover_text,
+            hoverinfo="text",
+            name="Existing Facilities",
+        ))
 
-    # ── New proposed facilities ───────────────────────────────────────────────
+    # ── New proposed facilities — numbered green circles ──────────────────────
     if not new_df.empty:
-        new_group = folium.FeatureGroup(name="New Facilities", show=True)
-        for _, row in new_df.iterrows():
-            folium.CircleMarker(
-                location=[row["lat"], row["lon"]],
-                radius=8,
-                color=COLOUR_NEW_RING,
-                weight=2.5,
-                fill=True,
-                fill_color=COLOUR_NEW,
-                fill_opacity=0.95,
-                tooltip=folium.Tooltip(
-                    f"<b>Proposed Facility</b><br>"
-                    f"ID: {row.get('new_facility', 'N/A')}<br>"
-                    f"Lat: {row['lat']:.4f} | Lon: {row['lon']:.4f}",
-                    sticky=False,
-                ),
-            ).add_to(new_group)
-        new_group.add_to(fmap)
+        labels      = [str(i + 1) for i in range(len(new_df))]
+        hover_texts = [
+            f"<b>Proposed Facility #{i + 1}</b><br>"
+            f"ID: {row.get('new_facility', 'N/A')}<br>"
+            f"{row['lat']:.4f}° N, {row['lon']:.4f}° E"
+            for i, (_, row) in enumerate(new_df.iterrows())
+        ]
+        fig.add_trace(go.Scattermap(
+            lat=new_df["lat"].tolist(),
+            lon=new_df["lon"].tolist(),
+            mode="markers+text",
+            marker=dict(
+                size=20,
+                color="#16A34A",
+                opacity=1.0,
+            ),
+            text=labels,
+            textfont=dict(color="white", size=11, family="Inter, sans-serif"),
+            textposition="middle center",
+            hovertext=hover_texts,
+            hoverinfo="text",
+            name="Proposed Facilities",
+        ))
 
-    folium.LayerControl(collapsed=False).add_to(fmap)
-    return fmap
-
-
-def get_map_html(existing_df: pd.DataFrame, new_df: pd.DataFrame) -> str:
-    """
-    Build a Folium map and return its full HTML representation as a string
-    suitable for embedding in a Dash html.Iframe srcDoc attribute.
-    """
-    fmap = build_folium_map(existing_df, new_df)
-    return fmap._repr_html_()
+    fig.update_layout(
+        map_style="open-street-map",
+        map=dict(
+            center=dict(lat=ZAMBIA_CENTER_LAT, lon=ZAMBIA_CENTER_LON),
+            zoom=MAP_ZOOM,
+        ),
+        margin=dict(l=0, r=0, t=0, b=0),
+        height=map_height_px,
+        showlegend=False,
+        paper_bgcolor="white",
+        hoverlabel=dict(
+            bgcolor="white",
+            bordercolor="#E2E8F0",
+            font=dict(family="Inter, sans-serif", size=12, color="#0F172A"),
+        ),
+        uirevision="map",   # preserve zoom/pan state across callback updates
+    )
+    return fig
 
 
 # ── Accessibility helpers ─────────────────────────────────────────────────────
 
 def get_new_facility_rows(results_df: pd.DataFrame, n: int) -> pd.DataFrame:
-    """
-    Return the first n rows from the optimisation results table.
-    Returns an empty DataFrame when n == 0.
-    """
+    """Return the first n rows from the optimisation results table."""
     if n == 0 or results_df.empty:
         return pd.DataFrame(columns=results_df.columns)
     return results_df.head(n).copy()
@@ -102,8 +135,7 @@ def get_new_facility_rows(results_df: pd.DataFrame, n: int) -> pd.DataFrame:
 
 def get_access_pct(results_df: pd.DataFrame, n: int, n_existing: int) -> float:
     """
-    Look up accessibility % for exactly (n_existing + n) total facilities.
-    Falls back to the tail of the first-n slice if the exact row is absent.
+    Look up accessibility % for (n_existing + n) total facilities.
     Returns BASELINE_ACCESS_PCT when n == 0.
     """
     if n == 0 or results_df.empty:
@@ -117,12 +149,9 @@ def get_access_pct(results_df: pd.DataFrame, n: int, n_existing: int) -> float:
     if not exact.empty:
         return float(exact.iloc[0])
 
-    # Fallback: last row of the first-n slice
     fallback = results_df.head(n)["total_population_access_pct"]
     return float(fallback.iloc[-1]) if not fallback.empty else BASELINE_ACCESS_PCT
 
-
-# ── KPI formatting helpers ────────────────────────────────────────────────────
 
 def format_delta(delta: float) -> str:
     """Return a signed, 2-decimal string for an accessibility delta."""
@@ -130,77 +159,122 @@ def format_delta(delta: float) -> str:
     return f"{sign}{delta:.2f}%"
 
 
-def kpi_card(label: str, value: str, sub: str, accent: str,
-             progress: float | None = None):
+# ── Plotly accessibility chart ────────────────────────────────────────────────
+
+def build_accessibility_chart(
+    results_df: pd.DataFrame,
+    n_new: int,
+    n_existing: int,
+) -> go.Figure:
     """
-    Return a Dash component tree for a single KPI scorecard block.
+    Smooth line chart: total_population_access_pct (Y) vs total_facilities (X).
 
-    Parameters
-    ----------
-    label    : uppercase label shown at the top
-    value    : large displayed metric
-    sub      : small subtitle / context line
-    accent   : CSS hex colour for the top border and value text
-    progress : optional 0–100 float that renders a thin animated progress bar
+    X-axis uses actual total_facilities column values (e.g. 80 → 110),
+    starting from n_existing (baseline) rather than 0.
+    The highlighted dot marks the currently selected slider position.
     """
-    # Lazily import here to avoid a circular dependency at module import time
-    from dash import html
+    # Include baseline as the first point (n_existing facilities, baseline %)
+    x_vals = [n_existing] + list(results_df["total_facilities"])
+    y_vals = [BASELINE_ACCESS_PCT] + list(results_df["total_population_access_pct"])
 
-    children = [
-        # Coloured top accent bar
-        html.Div(style={
-            "position": "absolute", "top": "0", "left": "0", "right": "0",
-            "height": "3px", "background": accent,
-            "borderRadius": "14px 14px 0 0",
-        }),
-        # Label
-        html.Div(label, style={
-            "fontSize": "0.63rem", "fontWeight": "700",
-            "textTransform": "uppercase", "letterSpacing": "1.5px",
-            "color": "#3D5068", "marginBottom": "8px",
-            "fontFamily": "'Space Mono', monospace",
-        }),
-        # Value
-        html.Div(value, style={
-            "fontFamily": "'Space Mono', monospace",
-            "fontSize": "2.1rem", "fontWeight": "700",
-            "lineHeight": "1", "color": accent,
-        }),
-        # Subtitle
-        html.Div(sub, style={
-            "fontSize": "0.73rem", "color": "#3D5068", "marginTop": "5px",
-        }),
-    ]
+    current_x = n_existing + n_new
+    current_y = get_access_pct(results_df, n_new, n_existing)
 
-    # Optional progress bar
-    if progress is not None:
-        pct = max(0.0, min(100.0, progress))
-        children.append(
-            html.Div(
-                html.Div(style={
-                    "width": f"{pct:.1f}%",
-                    "height": "100%",
-                    "background": f"linear-gradient(90deg, {accent}88, {accent})",
-                    "borderRadius": "99px",
-                    "transition": "width 0.6s cubic-bezier(.4,0,.2,1)",
-                }),
-                style={
-                    "marginTop": "14px", "background": "#0E1829",
-                    "borderRadius": "99px", "height": "4px", "overflow": "hidden",
-                },
-            )
-        )
+    y_min = round(min(y_vals) - 0.5, 1)
+    y_max = round(max(y_vals) + 0.5, 1)
 
-    return html.Div(
-        children=children,
-        style={
-            "background": "linear-gradient(155deg, #0C1625 0%, #101E30 100%)",
-            "border": "1px solid #182236",
-            "borderRadius": "14px",
-            "padding": "20px 20px 16px",
-            "position": "relative",
-            "overflow": "hidden",
-            "height": "100%",
-            "boxSizing": "border-box",
-        },
+    fig = go.Figure()
+
+    # Shaded fill under the curve
+    fig.add_trace(go.Scatter(
+        x=x_vals,
+        y=y_vals,
+        fill="tozeroy",
+        fillcolor="rgba(79,70,229,0.07)",
+        line=dict(color="#4F46E5", width=2.5, shape="spline"),
+        mode="lines",
+        hovertemplate="Facilities: %{x}<br>Access: %{y:.2f}%<extra></extra>",
+        name="Accessibility",
+    ))
+
+    # Current selection dot
+    fig.add_trace(go.Scatter(
+        x=[current_x],
+        y=[current_y],
+        mode="markers",
+        marker=dict(
+            color="#4F46E5",
+            size=11,
+            line=dict(color="white", width=2.5),
+        ),
+        hovertemplate=f"Facilities: {current_x}<br>Access: {current_y:.2f}%<extra></extra>",
+        name="Current",
+    ))
+
+    fig.update_layout(
+        paper_bgcolor="white",
+        plot_bgcolor="white",
+        margin=dict(l=48, r=12, t=10, b=44),
+        xaxis=dict(
+            title=dict(
+                text="Number of Health Facilities",
+                font=dict(size=10, color="#64748B", family="Inter, sans-serif"),
+            ),
+            gridcolor="#F1F5F9",
+            zeroline=False,
+            tickfont=dict(size=9, color="#94A3B8", family="Inter, sans-serif"),
+            range=[min(x_vals) - 0.5, max(x_vals) + 0.5],
+            tickmode="auto",
+            nticks=8,
+        ),
+        yaxis=dict(
+            tickformat=".0f",
+            ticksuffix="%",
+            gridcolor="#F1F5F9",
+            zeroline=False,
+            tickfont=dict(size=9, color="#94A3B8", family="Inter, sans-serif"),
+            range=[y_min, y_max],
+            title=dict(
+                text="Accessibility",
+                font=dict(size=10, color="#64748B", family="Inter, sans-serif"),
+            ),
+        ),
+        showlegend=False,
+        height=195,
+        hoverlabel=dict(
+            bgcolor="white",
+            bordercolor="#E2E8F0",
+            font=dict(family="Inter, sans-serif", size=11),
+        ),
     )
+    return fig
+
+
+# ── Recommended locations table data ─────────────────────────────────────────
+
+def get_recommended_table_rows(
+    results_df: pd.DataFrame,
+    n_new: int,
+) -> list[dict]:
+    """
+    Return a list of row dicts for the Recommended Locations table.
+    Keys: no, lon_dms, lat_dms, new_people
+    """
+    if n_new == 0 or results_df.empty:
+        return []
+
+    rows = results_df.head(n_new).reset_index(drop=True)
+
+    # Per-facility accessibility delta → estimate new people reached
+    access_vals = [BASELINE_ACCESS_PCT] + list(rows["total_population_access_pct"])
+    deltas      = [access_vals[i + 1] - access_vals[i] for i in range(len(rows))]
+
+    result = []
+    for i, (_, row) in enumerate(rows.iterrows()):
+        result.append({
+            "no":         i + 1,
+            "lon_dms":    _to_dms(float(row["lon"]), is_lat=False),
+            "lat_dms":    _to_dms(float(row["lat"]), is_lat=True),
+            "new_people": max(0, int(deltas[i] / 100 * ZAMBIA_POPULATION)),
+        })
+    return result
