@@ -78,31 +78,56 @@ def build_map_figure(
             name="Existing Facilities",
         ))
 
-    # ── New proposed facilities — numbered green circles ──────────────────────
+    # ── New proposed facilities ───────────────────────────────────────────────
+    # Why previous approaches failed:
+    #
+    #  ✗  Single trace, mode="markers+text"  — MapLibre collision detection
+    #     suppresses all but one labelled marker within the same trace layer.
+    #
+    #  ✗  Per-facility traces sharing legendgroup — legendgroup linkage can
+    #     still trigger MapLibre layer suppression across sibling traces.
+    #
+    # Definitive fix — two completely independent rendering layers:
+    #
+    #  ✓  Layer 1: ONE trace containing ALL green circles (mode="markers",
+    #     no text). Multi-point marker-only traces are never collision-checked.
+    #
+    #  ✓  Layer 2: ONE text-only trace PER facility (single point each).
+    #     Single-point text traces have nothing to collide with and always render.
+    #     They are completely decoupled from the marker layer.
     if not new_df.empty:
-        labels      = [str(i + 1) for i in range(len(new_df))]
         hover_texts = [
             f"<b>Proposed Facility #{i + 1}</b><br>"
             f"ID: {row.get('new_facility', 'N/A')}<br>"
             f"{row['lat']:.4f}° N, {row['lon']:.4f}° E"
             for i, (_, row) in enumerate(new_df.iterrows())
         ]
+
+        # Layer 1 — all green circles in one trace (always renders all points)
         fig.add_trace(go.Scattermap(
             lat=new_df["lat"].tolist(),
             lon=new_df["lon"].tolist(),
-            mode="markers+text",
-            marker=dict(
-                size=20,
-                color="#16A34A",
-                opacity=1.0,
-            ),
-            text=labels,
-            textfont=dict(color="white", size=11, family="Inter, sans-serif"),
-            textposition="middle center",
+            mode="markers",
+            marker=dict(size=24, color="#16A34A", opacity=1.0),
             hovertext=hover_texts,
             hoverinfo="text",
             name="Proposed Facilities",
+            showlegend=False,
         ))
+
+        # Layer 2 — one independent text trace per facility
+        for i, (_, row) in enumerate(new_df.iterrows()):
+            fig.add_trace(go.Scattermap(
+                lat=[row["lat"]],
+                lon=[row["lon"]],
+                mode="text",
+                text=[str(i + 1)],
+                textfont=dict(color="white", size=12,
+                              family="Inter, sans-serif"),
+                textposition="middle center",
+                hoverinfo="skip",
+                showlegend=False,
+            ))
 
     layout_kwargs = dict(
         map_style="open-street-map",
