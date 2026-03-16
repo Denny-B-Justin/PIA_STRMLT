@@ -18,4 +18,4 @@ COLOUR_NEW_RING     = "#0EA5E9"   # sky blue ring — new / proposed facilities
 BASELINE_ACCESS_PCT = 79.31
 
 # ── Slider bounds ─────────────────────────────────────────────────────────────
-MAX_NEW_FACILITIES  = 30
+MAX_NEW_FACILITIES  = 100
