@@ -336,7 +336,6 @@ def update_dashboard(n_new, existing_records, results_records):
             dbc.Card(
                 dbc.CardBody(
                     html.Div(
-                        dangerously_allow_html=True,
                         children=kpi_card(
                             label="Existing Facilities",
                             value=f"{n_existing:,}",
@@ -352,7 +351,6 @@ def update_dashboard(n_new, existing_records, results_records):
             dbc.Card(
                 dbc.CardBody(
                     html.Div(
-                        dangerously_allow_html=True,
                         children=kpi_card(
                             label="New Facilities",
                             value=str(n_new),
@@ -368,7 +366,6 @@ def update_dashboard(n_new, existing_records, results_records):
             dbc.Card(
                 dbc.CardBody(
                     html.Div(
-                        dangerously_allow_html=True,
                         children=kpi_card(
                             label="Population Access",
                             value=f"{access_pct:.1f}%",
@@ -384,7 +381,6 @@ def update_dashboard(n_new, existing_records, results_records):
             dbc.Card(
                 dbc.CardBody(
                     html.Div(
-                        dangerously_allow_html=True,
                         children=kpi_card(
                             label="Total Facilities",
                             value=f"{total_fac:,}",

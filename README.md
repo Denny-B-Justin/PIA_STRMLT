@@ -89,7 +89,7 @@ your-app/
 │   In-memory TTL Cache (5 min, 256 entry max)            │
 │   └── Databricks SQL Connector                          │
 │       └── Unity Catalog (prd_mega)                      │
-│           ├── sgbpi163.health_facilities_zmb            │
+│           ├── sgpbpi163.health_facilities_zmb            │
 │           └── sgpbpi163.lgu_accessibility_results_zmb  │
 └──────────────────────────────────────────────────────────┘
 ```
@@ -103,7 +103,7 @@ Data is fetched once on page load into Dash `dcc.Store` components. All subseque
 
 | Table | Schema | Description |
 |---|---|---|
-| `health_facilities_zmb` | `prd_mega.sgbpi163` | All existing health facilities — `id`, `lat`, `lon`, `name` |
+| `health_facilities_zmb` | `prd_mega.sgpbpi163` | All existing health facilities — `id`, `lat`, `lon`, `name` |
 | `lgu_accessibility_results_zmb` | `prd_mega.sgpbpi163` | Optimisation results — ranked new facility locations with cumulative accessibility % |
 
 **Population data:** WorldPop 2025 constrained 100m raster (pre-processed in `01_extract.ipynb`)
@@ -118,7 +118,7 @@ Data is fetched once on page load into Dash `dcc.Store` components. All subseque
 
 - Python **3.10+**
 - Access to the Databricks workspace with:
-  - Read permission on `prd_mega.sgbpi163.health_facilities_zmb`
+  - Read permission on `prd_mega.sgpbpi163.health_facilities_zmb`
   - Read permission on `prd_mega.sgpbpi163.lgu_accessibility_results_zmb`
   - A running **SQL Warehouse** (serverless recommended)
 - Either a **Personal Access Token** (local dev) or **Service Principal** (production)
@@ -179,7 +179,7 @@ DATABRICKS_CLIENT_SECRET= "YOUR_CLIENT_SECRET_HERE"
 SECRET_KEY=<your-random-secret-key>
 
 ZAMBIA_CATALOG=prd_mega
-FACILITIES_SCHEMA=sgbpi163
+FACILITIES_SCHEMA=sgpbpi163
 RESULTS_SCHEMA=sgpbpi163
 
 QUERY_CACHE_TTL_SECONDS=300

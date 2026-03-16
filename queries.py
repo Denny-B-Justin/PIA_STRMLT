@@ -14,7 +14,7 @@ logging.basicConfig(
 
 # ── Schema / table configuration (env overrides optional) ────────────────────
 ZAMBIA_CATALOG       = os.getenv("ZAMBIA_CATALOG", "prd_mega")
-FACILITIES_SCHEMA    = os.getenv("FACILITIES_SCHEMA", "sgbpi163")
+FACILITIES_SCHEMA    = os.getenv("FACILITIES_SCHEMA", "sgpbpi163")
 RESULTS_SCHEMA       = os.getenv("RESULTS_SCHEMA", "sgpbpi163")
 
 # ── Cache tuning (env overrides optional) ─────────────────────────────────────
@@ -88,24 +88,26 @@ class QueryService:
     # ── Core query executor ───────────────────────────────────────────────────
 
     def execute_query(self, query):
-        """
-        Executes a SQL query against Databricks and returns a pandas DataFrame.
-        Results are cached in-memory for QUERY_CACHE_TTL_SECONDS seconds.
-        """
         cached = self._cache_get(query)
         if cached is not None:
             logging.info("CACHE HIT for query (TTL=%ss): %s", self._cache_ttl, query)
-            return cached.copy(deep=True)
+            if not isinstance(cached, pd.DataFrame):
+                logging.warning("Stale cache entry type %s, evicting.", type(cached).__name__)
+                self._cache_set(query, None)  # evict bad entry
+            else:
+                return cached.copy(deep=True)
 
         start = time.time()
         with sql.connect(
-            server_hostname    = SERVER_HOSTNAME,
-            http_path          = os.getenv("DATABRICKS_HTTP_PATH"),
+            server_hostname      = SERVER_HOSTNAME,
+            http_path            = os.getenv("DATABRICKS_HTTP_PATH"),
             credentials_provider = credentials_provider,
         ) as conn:
             cursor = conn.cursor()
             cursor.execute(query)
-            df = cursor.fetchall_arrow().to_pandas()
+            rows    = cursor.fetchall()
+            columns = [desc[0] for desc in cursor.description]
+            df      = pd.DataFrame(rows, columns=columns)
 
         logging.info(
             "DB MISS (queried) took %.2f sec. query: %s",
@@ -115,7 +117,6 @@ class QueryService:
 
         self._cache_set(query, df)
         return df.copy(deep=True)
-
     # ── Domain queries ────────────────────────────────────────────────────────
 
     def get_existing_facilities(self):
