@@ -1,23 +1,7 @@
 """
 queries.py
 Databricks SQL data-access layer for the Zambia Health Access dashboard.
-
-Required environment variables:
-    DATABRICKS_SERVER_HOSTNAME   — e.g. adb-1234567890.12.azuredatabricks.net
-    DATABRICKS_HTTP_PATH         — e.g. /sql/1.0/warehouses/abc123
-    DATABRICKS_CLIENT_ID         — OAuth2 service-principal client ID
-    DATABRICKS_CLIENT_SECRET     — OAuth2 service-principal client secret
-
-Optional environment variables (override catalog / schema defaults):
-    ZAMBIA_CATALOG               — default: prd_mega
-    FACILITIES_SCHEMA            — default: sgpbpi163
-    RESULTS_SCHEMA               — default: sgpbpi163
-    QUERY_CACHE_TTL_SECONDS      — default: 300  (5 minutes)
-    QUERY_CACHE_MAX_ENTRIES      — default: 256
-
-The public interface (QueryService.get_instance(), get_existing_facilities(),
-get_accessibility_results()) is identical to the CSV trial version so that
-app.py and utils.py require zero changes when switching between environments.
+...
 """
 
 import os
@@ -27,9 +11,8 @@ import threading
 import pandas as pd
 from databricks import sql
 from databricks.sdk.core import Config, oauth_service_principal
+from typing import Dict, Optional, Tuple  # ← all generics from typing
 
-# ── Load .env file (must happen before any os.getenv calls) ──────────────────
-# Install if missing:  pip install python-dotenv
 try:
     from dotenv import load_dotenv
     load_dotenv()
@@ -41,18 +24,15 @@ except ImportError:
                         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     logging.warning("python-dotenv not installed — reading env vars from system only")
 
-# ── Catalog / schema configuration ───────────────────────────────────────────
 ZAMBIA_CATALOG    = os.getenv("ZAMBIA_CATALOG",    "prd_mega")
 FACILITIES_SCHEMA = os.getenv("FACILITIES_SCHEMA", "sgpbpi163")
 RESULTS_SCHEMA    = os.getenv("RESULTS_SCHEMA",    "sgpbpi163")
 
-# ── Cache tuning ──────────────────────────────────────────────────────────────
 QUERY_CACHE_TTL_SECONDS = int(os.getenv("QUERY_CACHE_TTL_SECONDS", "300"))
 QUERY_CACHE_MAX_ENTRIES = int(os.getenv("QUERY_CACHE_MAX_ENTRIES", "256"))
 
 SERVER_HOSTNAME = os.getenv("DATABRICKS_SERVER_HOSTNAME")
 
-# ── Startup credential validation ─────────────────────────────────────────────
 _REQUIRED = {
     "DATABRICKS_SERVER_HOSTNAME": SERVER_HOSTNAME,
     "DATABRICKS_HTTP_PATH":       os.getenv("DATABRICKS_HTTP_PATH"),
@@ -100,12 +80,12 @@ class QueryService:
 
     def __init__(self):
         # {sql_string: (expires_at_epoch, dataframe)}
-        self._cache: dict[str, tuple[float, pd.DataFrame]] = {}
+        self._cache: Dict[str, Tuple[float, pd.DataFrame]] = {}  # ← Dict/Tuple from typing
         self._lock  = threading.Lock()
 
     # ── Cache helpers ──────────────────────────────────────────────────────────
 
-    def _cache_get(self, key: str) -> pd.DataFrame | None:
+    def _cache_get(self, key: str) -> Optional[pd.DataFrame]:          # ← Optional (already correct)
         now = time.time()
         with self._lock:
             entry = self._cache.get(key)
@@ -120,7 +100,6 @@ class QueryService:
     def _cache_set(self, key: str, df: pd.DataFrame) -> None:
         expires_at = time.time() + QUERY_CACHE_TTL_SECONDS
         with self._lock:
-            # Simple FIFO eviction when capacity is reached
             if len(self._cache) >= QUERY_CACHE_MAX_ENTRIES:
                 oldest = next(iter(self._cache))
                 del self._cache[oldest]
@@ -174,10 +153,6 @@ class QueryService:
     # ── Domain queries ────────────────────────────────────────────────────────
 
     def get_existing_facilities(self) -> pd.DataFrame:
-        """
-        Returns all existing health facilities for Zambia.
-        Columns: id, lat, lon, name
-        """
         query = f"""
             SELECT id, lat, lon, name
             FROM {ZAMBIA_CATALOG}.{FACILITIES_SCHEMA}.health_facilities_zmb
@@ -190,12 +165,6 @@ class QueryService:
         return df.dropna(subset=["lat", "lon"]).reset_index(drop=True)
 
     def get_accessibility_results(self) -> pd.DataFrame:
-        """
-        Returns the optimisation results table sorted ascending by
-        total_facilities.  Row 0 = best single new site.
-        Columns: total_facilities, new_facility, lat, lon,
-                 total_population_access_pct
-        """
         query = f"""
             SELECT
                 total_facilities,
@@ -214,13 +183,7 @@ class QueryService:
         )
         return df.dropna(subset=["lat", "lon"]).reset_index(drop=True)
 
-    def get_user_credentials(self) -> dict[str, str]:
-        """
-        Returns a {username: bcrypt_hash} mapping for login authentication.
-        Only called when AUTH_ENABLED=true.
-
-        Expects a table with columns: username, password_hash
-        """
+    def get_user_credentials(self) -> Dict[str, str]:              # ← Dict from typing
         query = f"""
             SELECT username, password_hash
             FROM {ZAMBIA_CATALOG}.{FACILITIES_SCHEMA}.user_credentials

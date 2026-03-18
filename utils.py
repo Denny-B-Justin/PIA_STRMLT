@@ -16,7 +16,7 @@ Chart x-axis:
 
 import pandas as pd
 import plotly.graph_objects as go
-
+from typing import Dict, List, Optional
 from constants import (
     BASELINE_ACCESS_PCT,
     ZAMBIA_CENTER_LAT,
@@ -49,7 +49,7 @@ def _to_dms(decimal_deg: float, is_lat: bool) -> str:
 def build_map_figure(
     existing_df: pd.DataFrame,
     new_df: pd.DataFrame,
-    map_height_px: int | None = None,
+    map_height_px: Optional[int] = None,
 ) -> go.Figure:
     """
     Build a Plotly Scattermap figure with:
@@ -285,7 +285,7 @@ def build_accessibility_chart(
 def get_recommended_table_rows(
     results_df: pd.DataFrame,
     n_new: int,
-) -> list[dict]:
+) -> List[Dict]:
     """
     Return a list of row dicts for the Recommended Locations table.
     Keys: no, lon_dms, lat_dms, new_people
