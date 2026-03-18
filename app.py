@@ -13,7 +13,7 @@ Run:
 
 import pandas as pd
 import plotly.graph_objects as go
-
+from typing import Dict, List, Optional
 from dash import dcc, html, Dash, Input, Output, State, no_update
 import dash_bootstrap_components as dbc
 
@@ -336,7 +336,7 @@ def section_title(text: str) -> html.Div:
     return html.Div(text, style=SECTION_TITLE_STYLE)
 
 
-def legend_dot(color: str, border_color: str | None = None) -> html.Span:
+def legend_dot(color: str, border_color: Optional[str] = None) -> html.Span:
     style = {**LEGEND_DOT_BASE, "backgroundColor": color}
     if border_color:
         style["border"] = f"2px solid {border_color}"
@@ -377,7 +377,7 @@ def _empty_figure(height: int = 195) -> go.Figure:
     return fig
 
 
-def build_recommended_table(rows: list[dict]) -> html.Div:
+def build_recommended_table(rows: List[Dict]) -> html.Div:
     """HTML table for the Recommended Locations card."""
     if not rows:
         return html.Div(
