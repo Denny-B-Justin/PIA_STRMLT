@@ -447,7 +447,7 @@ app.layout = html.Div(
 
                 # Left: brand
                 html.Div([
-                    html.Div("TRIAL  ·  CSV DATA MODE", style=BADGE_STYLE),
+                    # html.Div("TRIAL  ·  CSV DATA MODE", style=BADGE_STYLE),
                     html.Div(
                         "Zambia Health Access",
                         style={
@@ -512,7 +512,7 @@ app.layout = html.Div(
                             "displayModeBar": False,
                             "scrollZoom": True,
                         },
-                        style={"width": "100%", "height": "100%"},
+                        style={"width": "100%", "height": f"calc(100vh - {HEADER_H}px)"},
                     ),
                 ),
 
@@ -846,7 +846,7 @@ def update_map(n_view, existing_records, results_records):
     existing_df = pd.DataFrame(existing_records)
     results_df  = pd.DataFrame(results_records)
     new_df      = get_new_facility_rows(results_df, n_view)
-    return build_map_figure(existing_df, new_df, map_height_px=500)
+    return build_map_figure(existing_df, new_df)
 
 
 @app.callback(
