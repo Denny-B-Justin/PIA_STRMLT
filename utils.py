@@ -25,7 +25,7 @@ from constants import (
 )
 
 # Zambia 2025 population estimate — used for "new people reached" calculation
-ZAMBIA_POPULATION = 20_500_000
+ZAMBIA_POPULATION = 21_559_131
 
 
 # ── DMS conversion ────────────────────────────────────────────────────────────
