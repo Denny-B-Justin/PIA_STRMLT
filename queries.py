@@ -171,13 +171,15 @@ class QueryService:
                 new_facility,
                 lat,
                 lon,
-                total_population_access_pct
-            FROM {ZAMBIA_CATALOG}.{RESULTS_SCHEMA}.lgu_accessibility_results_zmb
+                total_population_access_pct,
+                district
+            FROM {ZAMBIA_CATALOG}.{RESULTS_SCHEMA}.lgu_accessibility_results_zmb_10km
             ORDER BY total_facilities ASC
         """
         df = self.execute_query(query)
         df["lat"] = pd.to_numeric(df["lat"], errors="coerce")
         df["lon"] = pd.to_numeric(df["lon"], errors="coerce")
+        df["district"] = df["district"].fillna("—")
         df["total_population_access_pct"] = pd.to_numeric(
             df["total_population_access_pct"], errors="coerce"
         )

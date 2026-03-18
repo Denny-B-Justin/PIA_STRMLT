@@ -305,6 +305,8 @@ def get_recommended_table_rows(
             "no":         i + 1,
             "lon_dms":    _to_dms(float(row["lon"]), is_lat=False),
             "lat_dms":    _to_dms(float(row["lat"]), is_lat=True),
+            "district":   row.get("district") or "—",
             "new_people": max(0, int(deltas[i] / 100 * ZAMBIA_POPULATION)),
         })
     return result
+

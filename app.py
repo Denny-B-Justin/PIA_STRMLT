@@ -393,6 +393,7 @@ def build_recommended_table(rows: List[Dict]) -> html.Div:
         html.Th("NO",                        style=TH_STYLE),
         html.Th("LONGITUDE",                 style=TH_STYLE),
         html.Th("LATITUDE",                  style=TH_STYLE),
+        html.Th("DISTRICT",                   style=TH_STYLE),
         html.Th("N OF NEW PEOPLE WITHIN 10KM", style={**TH_STYLE, "textAlign": "right"}),
         html.Th("",                          style={**TH_STYLE, "width": "30px"}),
     ]))
@@ -412,6 +413,7 @@ def build_recommended_table(rows: List[Dict]) -> html.Div:
             html.Td(str(row["no"]),          style=row_td_style),
             html.Td(row["lon_dms"],           style=row_td_style),
             html.Td(row["lat_dms"],           style=row_td_style),
+            html.Td(row["district"],          style=row_td_style),
             html.Td(
                 f"{row['new_people']:,}",
                 style={**row_td_style, "textAlign": "right"},
@@ -500,7 +502,7 @@ app.layout = html.Div(
                 # ── LEFT: Map ────────────────────────────────────────────────
                 html.Div(
                     style={
-                        "flex": "0 0 52%",
+                        "flex": "0 0 50%",
                         "height": "100%",
                         "borderRight": f"1px solid {BORDER}",
                         "overflow": "hidden",
