@@ -11,6 +11,7 @@ Run:
     python app.py
 """
 
+import logging
 import pandas as pd
 import plotly.graph_objects as go
 from typing import Dict, List, Optional
@@ -45,6 +46,16 @@ app = Dash(
 
 db = QueryService.get_instance()
 
+# ── Pre-load GADM boundary at startup (cached for the process lifetime) ───────
+# This is a single fast query that runs once; subsequent map renders use the
+# module-level string directly — no per-request DB round-trip for the boundary.
+_BOUNDARY_WKT: Optional[str] = None
+try:
+    _BOUNDARY_WKT = db.get_gadm_boundary_wkt()
+    logging.info("GADM boundary loaded (len=%d chars)", len(_BOUNDARY_WKT or ""))
+except Exception as _bdry_exc:
+    logging.warning("GADM boundary load failed: %s", _bdry_exc)
+
 
 # ── Design tokens ─────────────────────────────────────────────────────────────
 
@@ -59,7 +70,8 @@ TEXT_LO    = "#94A3B8"
 
 ACC_INDIGO = "#4F46E5"     # primary — chart, active stats
 ACC_GREEN  = "#16A34A"     # proposed facility markers
-ACC_RED    = "#DC2626"     # existing facility markers
+ACC_RED    = "#DC2626"     # uncovered population dots
+ACC_BLUE   = "#2563EB"     # existing facility markers
 
 FONT_BODY  = "'Inter', sans-serif"
 FONT_MONO  = "'Space Mono', monospace"
@@ -495,16 +507,37 @@ app.layout = html.Div(
 
                 # Right: map legend
                 html.Div(
-                    style={"display": "flex", "gap": "10px",
-                           "alignItems": "center"},
+                    style={"display": "flex", "gap": "8px",
+                           "alignItems": "center", "flexWrap": "wrap"},
                     children=[
                         html.Div(style=LEGEND_PILL_STYLE, children=[
-                            legend_pin(ACC_RED),
+                            legend_pin(ACC_BLUE),
                             html.Span("Existing facility"),
                         ]),
                         html.Div(style=LEGEND_PILL_STYLE, children=[
                             legend_dot("#FFFFFF", border_color=ACC_GREEN),
                             html.Span("Proposed facility"),
+                        ]),
+                        html.Div(style=LEGEND_PILL_STYLE, children=[
+                            legend_dot("#22C55E"),
+                            html.Span("Pop. with access"),
+                        ]),
+                        html.Div(style=LEGEND_PILL_STYLE, children=[
+                            legend_dot(ACC_RED),
+                            html.Span("Pop. without access"),
+                        ]),
+                        html.Div(style=LEGEND_PILL_STYLE, children=[
+                            html.Span(style={
+                                "display": "inline-block",
+                                "width": "18px",
+                                "height": "3px",
+                                "backgroundColor": "#F97316",
+                                "borderRadius": "2px",
+                                "flexShrink": "0",
+                                "verticalAlign": "middle",
+                                "marginBottom": "1px",
+                            }),
+                            html.Span("Admin. boundary"),
                         ]),
                     ],
                 ),
@@ -529,13 +562,18 @@ app.layout = html.Div(
                         "overflow": "hidden",
                         "backgroundColor": "#EEF0F4",
                     },
-                    children=dcc.Graph(
-                        id="map-graph",
-                        config={
-                            "displayModeBar": False,
-                            "scrollZoom": True,
-                        },
-                        style={"width": "100%", "height": f"calc(100vh - {HEADER_H}px)"},
+                    children=dcc.Loading(
+                        id="map-loading",
+                        type="circle",
+                        color=ACC_INDIGO,
+                        children=dcc.Graph(
+                            id="map-graph",
+                            config={
+                                "displayModeBar": False,
+                                "scrollZoom": True,
+                            },
+                            style={"width": "100%", "height": f"calc(100vh - {HEADER_H}px)"},
+                        ),
                     ),
                 ),
 
@@ -904,6 +942,22 @@ def commit_view(n_clicks, n_new):
     Input("store-accessibility-results","data"),
 )
 def update_map(n_view_data, existing_records, results_records):
+    """
+    Rebuild the full map figure whenever the committed view count or the
+    underlying data stores change.
+
+    Five visual layers (in render order):
+      1. Population dots — uncovered (red)
+      2. Population dots — covered (green)
+      3. Administrative boundary (orange line)
+      4. Existing facilities (red circle markers)
+      5. Proposed new facilities (green numbered circles + labels)
+
+    Population coverage is computed via a Databricks SQL query whose result is
+    cached by QueryService for QUERY_CACHE_TTL_SECONDS seconds.  The boundary
+    WKT is pre-loaded at startup into the module-level _BOUNDARY_WKT string
+    and never re-fetched during the session.
+    """
     if existing_records is None or results_records is None:
         return _empty_figure(500)
 
@@ -916,7 +970,31 @@ def update_map(n_view_data, existing_records, results_records):
     existing_df = pd.DataFrame(existing_records)
     results_df  = pd.DataFrame(results_records)
     new_df      = get_new_facility_rows(results_df, n_view)
-    return build_map_figure(existing_df, new_df)
+
+    # ── Population coverage sample ─────────────────────────────────────────
+    # Derive the IDs of the new facilities selected at this step.
+    # For n_view == 0 (baseline) the list is empty → only existing coverage shown.
+    pop_df: Optional[pd.DataFrame] = None
+    try:
+        new_fac_ids: List[str] = []
+        if n_view > 0 and not results_df.empty:
+            new_fac_ids = (
+                results_df
+                .head(n_view)["new_facility"]
+                .dropna()
+                .astype(str)
+                .tolist()
+            )
+        pop_df = db.get_population_coverage_sample(new_fac_ids)
+    except Exception as exc:
+        logging.warning("Population coverage fetch failed: %s", exc)
+
+    return build_map_figure(
+        existing_df,
+        new_df,
+        pop_df=pop_df,
+        boundary_wkt=_BOUNDARY_WKT,
+    )
 
 @app.callback(
     Output("ca-total-fac",        "children"),

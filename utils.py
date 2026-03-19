@@ -14,9 +14,10 @@ Chart x-axis:
   (e.g. 80 → 110) rather than a 0-based new-facility count.
 """
 
+import logging
 import pandas as pd
 import plotly.graph_objects as go
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from constants import (
     BASELINE_ACCESS_PCT,
     ZAMBIA_CENTER_LAT,
@@ -26,6 +27,61 @@ from constants import (
 
 # Zambia 2025 population estimate — used for "new people reached" calculation
 ZAMBIA_POPULATION = 21_559_131
+
+
+# ── Geometry & colour helpers ─────────────────────────────────────────────────
+
+def _boundary_wkt_to_coords(wkt_str: str) -> Tuple[List, List]:
+    """
+    Parse a WKT POLYGON / MULTIPOLYGON into parallel lat / lon lists suitable
+    for a Plotly Scattermap line trace.
+
+    Pure-Python implementation — no shapely or other spatial library needed.
+    Ring segments are separated by None sentinels so Plotly draws each ring as
+    an independent closed path with no cross-ring connecting artefacts.
+
+    Supported WKT types: POLYGON(...) and MULTIPOLYGON(...)
+    Falls back to ([], []) on any parse error.
+    """
+    import re
+
+    if not wkt_str:
+        return [], []
+    try:
+        lats: List = []
+        lons: List = []
+
+        # Extract every coordinate ring — contents of each innermost (…) group
+        # that contains actual coordinate pairs (i.e. has at least one comma
+        # between two numbers).
+        ring_re   = re.compile(r"\(([^()]+)\)")
+        coord_re  = re.compile(r"(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)")
+
+        for ring_match in ring_re.finditer(wkt_str):
+            ring_str = ring_match.group(1)
+            pairs    = coord_re.findall(ring_str)
+            if len(pairs) < 2:          # skip degenerate / empty rings
+                continue
+            for lon_s, lat_s in pairs:
+                lons.append(float(lon_s))
+                lats.append(float(lat_s))
+            # None sentinel → Plotly lifts the pen between rings
+            lons.append(None)
+            lats.append(None)
+
+        return lats, lons
+    except Exception as exc:
+        logging.warning("Boundary WKT parse failed: %s", exc)
+        return [], []
+
+
+def _rgba(hex_color: str, opacity: float) -> str:
+    """Convert a #RRGGBB hex colour + scalar opacity → CSS rgba() string."""
+    r = int(hex_color[1:3], 16)
+    g = int(hex_color[3:5], 16)
+    b = int(hex_color[5:7], 16)
+    a = max(0.0, min(1.0, float(opacity)))
+    return f"rgba({r},{g},{b},{a:.2f})"
 
 
 # ── DMS conversion ────────────────────────────────────────────────────────────
@@ -46,22 +102,120 @@ def _to_dms(decimal_deg: float, is_lat: bool) -> str:
 
 # ── Map (Plotly Scattermap) ───────────────────────────────────────────────────
 
+# ── Map colour constants ──────────────────────────────────────────────────────
+
+_CLR_BOUNDARY      = "#F97316"               # orange line
+_CLR_BOUNDARY_FILL = "rgba(249,115,22,0.08)" # light beige/orange fill (low opacity)
+_CLR_EXISTING_FAC  = "#2563EB"               # blue  — existing health facilities
+_CLR_NEW_FAC       = "#16A34A"               # green — proposed new facilities
+_CLR_POP_COVERED   = "#22C55E"               # green — population with access
+_CLR_POP_UNCOVERED = "#EF4444"               # red   — population without access
+
+# Discrete opacity levels written by the notebook transform; one Scattermap
+# trace per level avoids unreliable per-point rgba string colouring.
+_POP_OPACITY_LEVELS = [0.1, 0.3, 0.6, 1.0]
+
+
 def build_map_figure(
     existing_df: pd.DataFrame,
     new_df: pd.DataFrame,
+    pop_df: Optional[pd.DataFrame] = None,
+    boundary_wkt: Optional[str] = None,
     map_height_px: Optional[int] = None,
 ) -> go.Figure:
     """
-    Build a Plotly Scattermap figure with:
-      • Red filled circles  → existing health facilities
-      • Green numbered circles → new / proposed facilities
+    Build a Plotly Scattermap that closely matches the reference Folium design.
 
-    Uses open-street-map tiles (no Mapbox token required).
-    Rendered as dcc.Graph — no iframe or external CDN needed.
+    Layer render order (bottom → top)
+    ──────────────────────────────────
+    1  Boundary FILL       – light beige/orange polygon fill (fill='toself')
+    2  Uncovered pop dots  – red, 4 separate traces one per opacity quartile
+    3  Covered pop dots    – green, 4 separate traces one per opacity quartile
+    4  Boundary LINE       – orange border, drawn above population dots
+    5  Existing facilities – solid blue circles, size=12 (larger than pop dots)
+    6  Proposed facilities – green numbered circles (one marker trace)
+    7+ Proposed labels     – white digit text, one single-point trace per fac
+
+    Population dots use per-trace opacity (marker.opacity) rather than
+    per-point rgba strings because Plotly Scattermap reliably honours
+    per-trace opacity but is inconsistent with per-point colour lists.
     """
     fig = go.Figure()
 
-    # ── Existing facilities ───────────────────────────────────────────────────
+    # Pre-compute boundary coords once (reused for fill + border traces)
+    b_lats: List = []
+    b_lons: List = []
+    if boundary_wkt:
+        b_lats, b_lons = _boundary_wkt_to_coords(boundary_wkt)
+
+    # ── LAYER 1: Boundary fill ────────────────────────────────────────────────
+    # fill='toself' fills each ring segment separated by None sentinels.
+    # The line is transparent here; the visible orange border is a separate
+    # trace (layer 4) drawn above the population dots.
+    if b_lats:
+        fig.add_trace(go.Scattermap(
+            lat=b_lats,
+            lon=b_lons,
+            mode="lines",
+            fill="toself",
+            fillcolor=_CLR_BOUNDARY_FILL,
+            line=dict(color="rgba(0,0,0,0)", width=0),
+            hoverinfo="skip",
+            showlegend=False,
+            name="boundary-fill",
+        ))
+
+    # ── LAYERS 2–3: Population dots ───────────────────────────────────────────
+    # Split into 4 sub-traces per colour (one per discrete opacity value).
+    # This guarantees correct opacity rendering on all Plotly/MapLibre versions.
+    if pop_df is not None and not pop_df.empty:
+        uncov = pop_df[~pop_df["covered"]]
+        cov   = pop_df[ pop_df["covered"]]
+
+        for op in _POP_OPACITY_LEVELS:
+            tol = 0.09  # tolerance for floating-point representation of 0.1/0.3/…
+
+            su = uncov[(uncov["opacity"] - op).abs() <= tol]
+            if not su.empty:
+                fig.add_trace(go.Scattermap(
+                    lat=su["ycoord"].tolist(),
+                    lon=su["xcoord"].tolist(),
+                    mode="markers",
+                    marker=dict(size=7, color=_CLR_POP_UNCOVERED, opacity=op),
+                    hovertemplate="Population without access<extra></extra>",
+                    showlegend=False,
+                    name=f"uncov-{op}",
+                ))
+
+            sc = cov[(cov["opacity"] - op).abs() <= tol]
+            if not sc.empty:
+                fig.add_trace(go.Scattermap(
+                    lat=sc["ycoord"].tolist(),
+                    lon=sc["xcoord"].tolist(),
+                    mode="markers",
+                    marker=dict(size=7, color=_CLR_POP_COVERED, opacity=op),
+                    hovertemplate="Population with access<extra></extra>",
+                    showlegend=False,
+                    name=f"cov-{op}",
+                ))
+
+    # ── LAYER 4: Boundary border line ─────────────────────────────────────────
+    # Rendered after population dots so the orange line sits on top of them.
+    if b_lats:
+        fig.add_trace(go.Scattermap(
+            lat=b_lats,
+            lon=b_lons,
+            mode="lines",
+            line=dict(color=_CLR_BOUNDARY, width=2.5),
+            hoverinfo="skip",
+            showlegend=False,
+            name="boundary-line",
+        ))
+
+    # ── LAYER 5: Existing facilities (blue) ───────────────────────────────────
+    # size=8 keeps them clearly distinguishable from population dots (size=7)
+    # without dominating the map when thousands of facilities are rendered.
+    # Blue avoids confusion with red (uncovered) and green (covered) population.
     if not existing_df.empty:
         hover_text = [
             f"<b>{row.get('name', 'Health Facility')}</b><br>"
@@ -72,29 +226,17 @@ def build_map_figure(
             lat=existing_df["lat"].tolist(),
             lon=existing_df["lon"].tolist(),
             mode="markers",
-            marker=dict(size=7, color="#DC2626", opacity=0.75),
+            marker=dict(size=8, color=_CLR_EXISTING_FAC, opacity=0.85),
             text=hover_text,
             hoverinfo="text",
             name="Existing Facilities",
+            showlegend=False,
         ))
 
-    # ── New proposed facilities ───────────────────────────────────────────────
-    # Why previous approaches failed:
-    #
-    #  ✗  Single trace, mode="markers+text"  — MapLibre collision detection
-    #     suppresses all but one labelled marker within the same trace layer.
-    #
-    #  ✗  Per-facility traces sharing legendgroup — legendgroup linkage can
-    #     still trigger MapLibre layer suppression across sibling traces.
-    #
-    # Definitive fix — two completely independent rendering layers:
-    #
-    #  ✓  Layer 1: ONE trace containing ALL green circles (mode="markers",
-    #     no text). Multi-point marker-only traces are never collision-checked.
-    #
-    #  ✓  Layer 2: ONE text-only trace PER facility (single point each).
-    #     Single-point text traces have nothing to collide with and always render.
-    #     They are completely decoupled from the marker layer.
+    # ── LAYERS 6+: Proposed new facilities ────────────────────────────────────
+    # Two-trace approach to defeat MapLibre collision-detection on labels:
+    #   • ONE multi-point marker trace → all circles, never collision-checked
+    #   • ONE single-point text trace per facility → nothing to collide with
     if not new_df.empty:
         hover_texts = [
             f"<b>Proposed Facility #{i + 1}</b><br>"
@@ -103,19 +245,17 @@ def build_map_figure(
             for i, (_, row) in enumerate(new_df.iterrows())
         ]
 
-        # Layer 1 — all green circles in one trace (always renders all points)
         fig.add_trace(go.Scattermap(
             lat=new_df["lat"].tolist(),
             lon=new_df["lon"].tolist(),
             mode="markers",
-            marker=dict(size=24, color="#16A34A", opacity=1.0),
+            marker=dict(size=24, color=_CLR_NEW_FAC, opacity=1.0),
             hovertext=hover_texts,
             hoverinfo="text",
             name="Proposed Facilities",
             showlegend=False,
         ))
 
-        # Layer 2 — one independent text trace per facility
         for i, (_, row) in enumerate(new_df.iterrows()):
             fig.add_trace(go.Scattermap(
                 lat=[row["lat"]],
@@ -129,7 +269,8 @@ def build_map_figure(
                 showlegend=False,
             ))
 
-    layout_kwargs = dict(
+    # ── Layout ────────────────────────────────────────────────────────────────
+    layout_kwargs: Dict = dict(
         map_style="open-street-map",
         map=dict(
             center=dict(lat=ZAMBIA_CENTER_LAT, lon=ZAMBIA_CENTER_LON),
@@ -309,4 +450,3 @@ def get_recommended_table_rows(
             "new_people": max(0, int(deltas[i] / 100 * ZAMBIA_POPULATION)),
         })
     return result
-
