@@ -249,7 +249,7 @@ def build_map_figure(
             lat=new_df["lat"].tolist(),
             lon=new_df["lon"].tolist(),
             mode="markers",
-            marker=dict(size=24, color=_CLR_NEW_FAC, opacity=1.0),
+            marker=dict(size=14, color=_CLR_NEW_FAC, opacity=1.0),
             hovertext=hover_texts,
             hoverinfo="text",
             name="Proposed Facilities",
