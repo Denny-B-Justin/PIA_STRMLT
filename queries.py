@@ -185,6 +185,34 @@ class QueryService:
         )
         return df.dropna(subset=["lat", "lon"]).reset_index(drop=True)
 
+    def get_accessibility_results_by_distance(self, distance_km: int = 10) -> pd.DataFrame:
+        """
+        Fetch optimisation results for the given catchment radius.
+        distance_km must be 5 or 10; maps to:
+          5  → lgu_accessibility_results_zmb_5km
+          10 → lgu_accessibility_results_zmb_10km
+        """
+        table = f"lgu_accessibility_results_zmb_{distance_km}km"
+        query = f"""
+            SELECT
+                total_facilities,
+                new_facility,
+                lat,
+                lon,
+                total_population_access_pct,
+                district
+            FROM {ZAMBIA_CATALOG}.{RESULTS_SCHEMA}.{table}
+            ORDER BY total_facilities ASC
+        """
+        df = self.execute_query(query)
+        df["lat"] = pd.to_numeric(df["lat"], errors="coerce")
+        df["lon"] = pd.to_numeric(df["lon"], errors="coerce")
+        df["district"] = df["district"].fillna("—")
+        df["total_population_access_pct"] = pd.to_numeric(
+            df["total_population_access_pct"], errors="coerce"
+        )
+        return df.dropna(subset=["lat", "lon"]).reset_index(drop=True)
+
     def get_user_credentials(self) -> Dict[str, str]:              # ← Dict from typing
         query = f"""
             SELECT username, password_hash

@@ -95,6 +95,7 @@ def build_map_figure(
     new_df: pd.DataFrame,
     boundary_wkt: Optional[str] = None,
     map_height_px: Optional[int] = None,
+    uirevision: str = "map",
 ) -> go.Figure:
     """
     Build a Plotly Scattermap figure with:
@@ -155,22 +156,13 @@ def build_map_figure(
         ))
 
     # ── New proposed facilities ───────────────────────────────────────────────
-    # Why previous approaches failed:
+    # Hollow-circle appearance using three layers:
+    #   Layer A: green outer ring (large filled circle)
+    #   Layer B: white inner fill (smaller filled circle drawn on top)
+    #   Layer C: per-facility numbered text (one independent trace each)
     #
-    #  ✗  Single trace, mode="markers+text"  — MapLibre collision detection
-    #     suppresses all but one labelled marker within the same trace layer.
-    #
-    #  ✗  Per-facility traces sharing legendgroup — legendgroup linkage can
-    #     still trigger MapLibre layer suppression across sibling traces.
-    #
-    # Definitive fix — two completely independent rendering layers:
-    #
-    #  ✓  Layer 1: ONE trace containing ALL green circles (mode="markers",
-    #     no text). Multi-point marker-only traces are never collision-checked.
-    #
-    #  ✓  Layer 2: ONE text-only trace PER facility (single point each).
-    #     Single-point text traces have nothing to collide with and always render.
-    #     They are completely decoupled from the marker layer.
+    # go.Scattermap does not support marker.line for outlines, so we simulate
+    # a hollow circle by stacking two marker-only traces of different sizes.
     if not new_df.empty:
         hover_texts = [
             f"<b>Proposed Facility #{i + 1}</b><br>"
@@ -179,26 +171,36 @@ def build_map_figure(
             for i, (_, row) in enumerate(new_df.iterrows())
         ]
 
-        # Layer 1 — all green circles in one trace (always renders all points)
+        # Layer A — green outer ring (all proposed points, single trace)
         fig.add_trace(go.Scattermap(
             lat=new_df["lat"].tolist(),
             lon=new_df["lon"].tolist(),
             mode="markers",
-            marker=dict(size=24, color="#16A34A", opacity=1.0),
+            marker=dict(size=26, color="#16A34A", opacity=1.0),
             hovertext=hover_texts,
             hoverinfo="text",
             name="Proposed Facilities",
             showlegend=False,
         ))
 
-        # Layer 2 — one independent text trace per facility
+        # Layer B — white inner fill (creates the hollow look)
+        fig.add_trace(go.Scattermap(
+            lat=new_df["lat"].tolist(),
+            lon=new_df["lon"].tolist(),
+            mode="markers",
+            marker=dict(size=17, color="#FFFFFF", opacity=1.0),
+            hoverinfo="skip",
+            showlegend=False,
+        ))
+
+        # Layer C — one independent text trace per facility (number label)
         for i, (_, row) in enumerate(new_df.iterrows()):
             fig.add_trace(go.Scattermap(
                 lat=[row["lat"]],
                 lon=[row["lon"]],
                 mode="text",
                 text=[str(i + 1)],
-                textfont=dict(color="white", size=12,
+                textfont=dict(color="#16A34A", size=11,
                               family="Inter, sans-serif"),
                 textposition="middle center",
                 hoverinfo="skip",
@@ -219,7 +221,7 @@ def build_map_figure(
             bordercolor="#E2E8F0",
             font=dict(family="Inter, sans-serif", size=12, color="#0F172A"),
         ),
-        uirevision="map",
+        uirevision=uirevision,
     )
     if map_height_px is not None:
         layout_kwargs["height"] = map_height_px
@@ -239,13 +241,18 @@ def get_new_facility_rows(results_df: pd.DataFrame, n: int) -> pd.DataFrame:
     return results_df.head(n).copy()
 
 
-def get_access_pct(results_df: pd.DataFrame, n: int, n_existing: int) -> float:
+def get_access_pct(
+    results_df: pd.DataFrame,
+    n: int,
+    n_existing: int,
+    baseline_pct: float = BASELINE_ACCESS_PCT,
+) -> float:
     """
     Look up accessibility % for (n_existing + n) total facilities.
-    Returns BASELINE_ACCESS_PCT when n == 0.
+    Returns baseline_pct when n == 0.
     """
     if n == 0 or results_df.empty:
-        return BASELINE_ACCESS_PCT
+        return baseline_pct
 
     target = n_existing + n
     exact  = results_df.loc[
@@ -271,6 +278,7 @@ def build_accessibility_chart(
     results_df: pd.DataFrame,
     n_new: int,
     n_existing: int,
+    baseline_pct: float = BASELINE_ACCESS_PCT,
 ) -> go.Figure:
     """
     Smooth line chart: total_population_access_pct (Y) vs total_facilities (X).
@@ -281,10 +289,10 @@ def build_accessibility_chart(
     """
     # Include baseline as the first point (n_existing facilities, baseline %)
     x_vals = [n_existing] + list(results_df["total_facilities"])
-    y_vals = [BASELINE_ACCESS_PCT] + list(results_df["total_population_access_pct"])
+    y_vals = [baseline_pct] + list(results_df["total_population_access_pct"])
 
     current_x = n_existing + n_new
-    current_y = get_access_pct(results_df, n_new, n_existing)
+    current_y = get_access_pct(results_df, n_new, n_existing, baseline_pct)
 
     y_min = round(min(y_vals) - 0.5, 1)
     y_max = round(max(y_vals) + 0.5, 1)
@@ -361,6 +369,7 @@ def build_accessibility_chart(
 def get_recommended_table_rows(
     results_df: pd.DataFrame,
     n_new: int,
+    baseline_pct: float = BASELINE_ACCESS_PCT,
 ) -> List[Dict]:
     """
     Return a list of row dicts for the Recommended Locations table.
@@ -372,7 +381,7 @@ def get_recommended_table_rows(
     rows = results_df.head(n_new).reset_index(drop=True)
 
     # Per-facility accessibility delta → estimate new people reached
-    access_vals = [BASELINE_ACCESS_PCT] + list(rows["total_population_access_pct"])
+    access_vals = [baseline_pct] + list(rows["total_population_access_pct"])
     deltas      = [access_vals[i + 1] - access_vals[i] for i in range(len(rows))]
 
     result = []
@@ -385,4 +394,3 @@ def get_recommended_table_rows(
             "new_people": max(0, int(deltas[i] / 100 * ZAMBIA_POPULATION)),
         })
     return result
-
