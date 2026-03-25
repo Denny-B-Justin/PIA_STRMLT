@@ -16,6 +16,7 @@ import plotly.graph_objects as go
 from typing import Dict, List, Optional
 from dash import dcc, html, Dash, Input, Output, State, no_update
 import dash_bootstrap_components as dbc
+import logging
 
 from queries import QueryService
 from server import server
@@ -45,7 +46,12 @@ app = Dash(
 
 db = QueryService.get_instance()
 
-
+_BOUNDARY_WKT: Optional[str] = None
+try:
+    _BOUNDARY_WKT = db.get_gadm_boundary_wkt()
+    logging.info("GADM boundary loaded (len=%d chars)", len(_BOUNDARY_WKT or ""))
+except Exception as _bdry_exc:
+    logging.warning("GADM boundary load failed: %s", _bdry_exc)
 # ── Design tokens ─────────────────────────────────────────────────────────────
 
 BG_PAGE    = "#F8FAFC"
@@ -505,6 +511,20 @@ app.layout = html.Div(
                         html.Div(style=LEGEND_PILL_STYLE, children=[
                             legend_dot("#FFFFFF", border_color=ACC_GREEN),
                             html.Span("Proposed facility"),
+                        
+                        ]),
+                        html.Div(style=LEGEND_PILL_STYLE, children=[
+                            html.Span(style={
+                                "display": "inline-block",
+                                "width": "18px",
+                                "height": "3px",
+                                "backgroundColor": "#F67215",
+                                "borderRadius": "2px",
+                                "flexShrink": "0",
+                                "verticalAlign": "middle",
+                                "marginBottom": "1px",
+                            }),
+                            html.Span("Zambia boundary"),
                         ]),
                     ],
                 ),
@@ -916,7 +936,7 @@ def update_map(n_view_data, existing_records, results_records):
     existing_df = pd.DataFrame(existing_records)
     results_df  = pd.DataFrame(results_records)
     new_df      = get_new_facility_rows(results_df, n_view)
-    return build_map_figure(existing_df, new_df)
+    return build_map_figure(existing_df, new_df, boundary_wkt=_BOUNDARY_WKT)
 
 @app.callback(
     Output("ca-total-fac",        "children"),
