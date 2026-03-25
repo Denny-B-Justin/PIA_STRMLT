@@ -13,10 +13,10 @@ Chart x-axis:
   X-axis now shows actual total_facilities values from the results table
   (e.g. 80 → 110) rather than a 0-based new-facility count.
 """
-
+import logging
 import pandas as pd
 import plotly.graph_objects as go
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 from constants import (
     BASELINE_ACCESS_PCT,
     ZAMBIA_CENTER_LAT,
@@ -27,8 +27,52 @@ from constants import (
 # Zambia 2025 population estimate — used for "new people reached" calculation
 ZAMBIA_POPULATION = 21_559_131
 
-
+_CLR_BOUNDARY      = "#F97316"               # orange line
+_CLR_BOUNDARY_FILL = "rgba(249,115,22,0.05)" # light beige/orange fill (low opacity)
 # ── DMS conversion ────────────────────────────────────────────────────────────
+def _boundary_wkt_to_coords(wkt_str: str) -> Tuple[List, List]:
+    """
+    Parse a WKT POLYGON / MULTIPOLYGON into parallel lat / lon lists suitable
+    for a Plotly Scattermap line trace.
+
+    Pure-Python implementation — no shapely or other spatial library needed.
+    Ring segments are separated by None sentinels so Plotly draws each ring as
+    an independent closed path with no cross-ring connecting artefacts.
+
+    Supported WKT types: POLYGON(...) and MULTIPOLYGON(...)
+    Falls back to ([], []) on any parse error.
+    """
+    import re
+
+    if not wkt_str:
+        return [], []
+    try:
+        lats: List = []
+        lons: List = []
+
+        # Extract every coordinate ring — contents of each innermost (…) group
+        # that contains actual coordinate pairs (i.e. has at least one comma
+        # between two numbers).
+        ring_re   = re.compile(r"\(([^()]+)\)")
+        coord_re  = re.compile(r"(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)")
+
+        for ring_match in ring_re.finditer(wkt_str):
+            ring_str = ring_match.group(1)
+            pairs    = coord_re.findall(ring_str)
+            if len(pairs) < 2:          # skip degenerate / empty rings
+                continue
+            for lon_s, lat_s in pairs:
+                lons.append(float(lon_s))
+                lats.append(float(lat_s))
+            # None sentinel → Plotly lifts the pen between rings
+            lons.append(None)
+            lats.append(None)
+
+        return lats, lons
+    except Exception as exc:
+        logging.warning("Boundary WKT parse failed: %s", exc)
+        return [], []
+
 
 def _to_dms(decimal_deg: float, is_lat: bool) -> str:
     """Convert decimal-degree coordinate to DMS string, e.g. 28° 02' 26.67\" E."""
@@ -49,6 +93,7 @@ def _to_dms(decimal_deg: float, is_lat: bool) -> str:
 def build_map_figure(
     existing_df: pd.DataFrame,
     new_df: pd.DataFrame,
+    boundary_wkt: Optional[str] = None,
     map_height_px: Optional[int] = None,
 ) -> go.Figure:
     """
@@ -60,7 +105,38 @@ def build_map_figure(
     Rendered as dcc.Graph — no iframe or external CDN needed.
     """
     fig = go.Figure()
+    b_lats: List = []
+    b_lons: List = []
+    if boundary_wkt:
+        b_lats, b_lons = _boundary_wkt_to_coords(boundary_wkt)
 
+    # ── LAYER 1: Boundary fill ────────────────────────────────────────────────
+    # fill='toself' fills each ring segment separated by None sentinels.
+    # The line is transparent here; the visible orange border is a separate
+    # trace (layer 4) drawn above the population dots.
+    if b_lats:
+        fig.add_trace(go.Scattermap(
+            lat=b_lats,
+            lon=b_lons,
+            mode="lines",
+            fill="toself",
+            fillcolor=_CLR_BOUNDARY_FILL,
+            line=dict(color="rgba(0,0,0,0)", width=0),
+            hoverinfo="skip",
+            showlegend=False,
+            name="boundary-fill",
+        ))
+
+    if b_lats:
+        fig.add_trace(go.Scattermap(
+            lat=b_lats,
+            lon=b_lons,
+            mode="lines",
+            line=dict(color=_CLR_BOUNDARY, width=2.5),
+            hoverinfo="skip",
+            showlegend=False,
+            name="boundary-line",
+        ))
     # ── Existing facilities ───────────────────────────────────────────────────
     if not existing_df.empty:
         hover_text = [

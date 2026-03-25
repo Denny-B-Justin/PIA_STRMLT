@@ -192,3 +192,26 @@ class QueryService:
         """
         df = self.execute_query(query)
         return dict(zip(df["username"], df["password_hash"]))
+    
+    def get_gadm_boundary_wkt(self) -> Optional[str]:
+        """
+        Return the Zambia national boundary geometry as a WKT string.
+
+        The gadm_boundaries_zmb table contains the country-level (GADM level-0)
+        polygon(s).  We take the first row; for a single-country dashboard this
+        is always the full national boundary.
+        """
+        query = f"""
+            SELECT geometry_wkt
+            FROM {ZAMBIA_CATALOG}.{FACILITIES_SCHEMA}.gadm_boundaries_zmb
+            LIMIT 1
+        """
+        df = self.execute_query(query)
+        if df.empty:
+            logging.warning("gadm_boundaries_zmb returned no rows")
+            return None
+        val = df["geometry_wkt"].iloc[0]
+        if val is None:
+            logging.warning("gadm_boundaries_zmb geometry_wkt is NULL")
+            return None
+        return str(val)
