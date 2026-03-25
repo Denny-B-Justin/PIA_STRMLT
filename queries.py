@@ -221,39 +221,23 @@ class QueryService:
     def get_population_coverage_sample(
         self,
         new_facility_ids: List[str],
-        sample_size: int = 6000,
     ) -> pd.DataFrame:
         """
-        Return a geographically distributed sample of population points labelled
-        as covered or uncovered, with roughly equal class sizes.
+        Return ALL population points from the UC table labelled as covered
+        or uncovered.  No sampling — the full country dataset is returned.
 
-        WHY TABLESAMPLE instead of LIMIT
-        ─────────────────────────────────
-        Delta Lake stores data in Parquet files ordered by write sequence /
-        partition key.  A bare LIMIT returns the first N rows from the first
-        few files, which are all in the same geographic partition — producing a
-        tight cluster in one corner of the country instead of a country-wide
-        scatter.
+        Two independent queries are issued and concatenated:
 
-        TABLESAMPLE(x ROWS) in Databricks SQL performs a Bernoulli-style
-        approximate row-count sample **across all partitions / files** without
-        reading the full table or sorting, giving us the geographic distribution
-        we need.  The sample size is approximate; we cap with LIMIT as a safety
-        guard but expect TABLESAMPLE to deliver roughly the requested count.
+          Query A – COVERED
+            INNER JOIN population_aoi against the union of existing + new
+            coverage tables.  Every matched row is a genuinely covered point.
 
-        Strategy — two independent queries, then concatenated:
+          Query B – UNCOVERED
+            LEFT ANTI JOIN population_aoi against the same coverage union.
+            Every returned row is guaranteed uncovered.
 
-          Query A – COVERED sample
-            1. TABLESAMPLE the population_aoi table for geographic spread.
-            2. INNER JOIN against the union of existing + new coverage tables
-               to label each sampled point as covered.
-            This is faster than driving from the (huge) coverage table because
-            TABLESAMPLE reduces the population set before the join.
-
-          Query B – UNCOVERED sample
-            1. TABLESAMPLE the population_aoi table.
-            2. LEFT ANTI JOIN against the same coverage union to keep only
-               uncovered points.
+        Adding new_facility_ids extends the covered set by UNION-ing in
+        potential_coverage_zmb_10km filtered to those IDs.
 
         Column schema returned:
             xcoord  – decimal longitude  (float)
@@ -261,15 +245,9 @@ class QueryService:
             opacity – 0.1 / 0.3 / 0.6 / 1.0  (float, rounded to 1 dp)
             covered – bool
         """
-        half = max(200, sample_size // 2)
-        # TABLESAMPLE oversample multiplier: ask for more rows than needed so
-        # that after the join (which may discard non-matching rows) we still
-        # have enough points.  The final LIMIT caps each result set.
-        ts_rows = half * 8
         s = f"{ZAMBIA_CATALOG}.{FACILITIES_SCHEMA}"
 
         # ── Covered-IDs union clause ───────────────────────────────────────────
-        # Builds the "all covered pop_IDs" sub-select used in both queries.
         if new_facility_ids:
             ids_lit = ", ".join(f"'{fid}'" for fid in new_facility_ids)
             new_union = f"""
@@ -280,43 +258,38 @@ class QueryService:
         else:
             new_union = ""
 
-        # ── Query A: covered population sample ────────────────────────────────
-        # TABLESAMPLE on the pop table → geographically distributed candidate
-        # rows → INNER JOIN against coverage IDs to keep only covered ones.
+        # ── Query A: all covered population points ────────────────────────────
         covered_q = f"""
             SELECT
                 p.xcoord,
                 p.ycoord,
                 CAST(p.opacity AS DOUBLE) AS opacity
-            FROM {s}.population_aoi_zmb_2025_10km TABLESAMPLE({ts_rows} ROWS) AS p
+            FROM {s}.population_aoi_zmb_2025_10km p
             INNER JOIN (
                 SELECT pop_ID FROM {s}.facilities_coverage_zmb_10km
                 {new_union}
             ) cov
                 ON p.ID = cov.pop_ID
-            LIMIT {half}
         """
 
-        # ── Query B: uncovered population sample ──────────────────────────────
-        # Same TABLESAMPLE on pop table → LEFT ANTI JOIN removes covered rows.
+        # ── Query B: all uncovered population points ──────────────────────────
         uncovered_q = f"""
             SELECT
                 p.xcoord,
                 p.ycoord,
                 CAST(p.opacity AS DOUBLE) AS opacity
-            FROM {s}.population_aoi_zmb_2025_10km TABLESAMPLE({ts_rows} ROWS) AS p
+            FROM {s}.population_aoi_zmb_2025_10km p
             LEFT ANTI JOIN (
                 SELECT pop_ID FROM {s}.facilities_coverage_zmb_10km
                 {new_union}
             ) cov
                 ON p.ID = cov.pop_ID
-            LIMIT {half}
         """
 
         try:
             covered_df = self.execute_query(covered_q)
             covered_df["covered"] = True
-            logging.info("Covered pop sample: %d rows", len(covered_df))
+            logging.info("Covered population rows: %d", len(covered_df))
         except Exception as exc:
             logging.warning("Covered population query failed: %s", exc)
             covered_df = pd.DataFrame(columns=["xcoord", "ycoord", "opacity", "covered"])
@@ -324,7 +297,7 @@ class QueryService:
         try:
             uncovered_df = self.execute_query(uncovered_q)
             uncovered_df["covered"] = False
-            logging.info("Uncovered pop sample: %d rows", len(uncovered_df))
+            logging.info("Uncovered population rows: %d", len(uncovered_df))
         except Exception as exc:
             logging.warning("Uncovered population query failed: %s", exc)
             uncovered_df = pd.DataFrame(columns=["xcoord", "ycoord", "opacity", "covered"])
@@ -337,7 +310,7 @@ class QueryService:
         )
         df["covered"] = df["covered"].fillna(False).astype(bool)
         logging.info(
-            "Population sample total: %d covered + %d uncovered = %d pts",
+            "Population total: %d covered + %d uncovered = %d pts",
             df["covered"].sum(), (~df["covered"]).sum(), len(df),
         )
         return df.dropna(subset=["xcoord", "ycoord"]).reset_index(drop=True)
