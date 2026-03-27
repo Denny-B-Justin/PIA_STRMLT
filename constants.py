@@ -1,7 +1,7 @@
 # ── Map defaults ──────────────────────────────────────────────────────────────
 ZAMBIA_CENTER_LAT   = -13.5
 ZAMBIA_CENTER_LON   = 28.0
-MAP_ZOOM            = 6
+MAP_ZOOM            = 5.25
 
 # ── Marker sizes ──────────────────────────────────────────────────────────────
 RADIUS_EXISTING_M   = 8_000
