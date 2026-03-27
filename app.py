@@ -10,18 +10,18 @@ Run:
     pip install dash dash-bootstrap-components pandas flask plotly
     python app.py
 """
-
+import logging
 import pandas as pd
 import plotly.graph_objects as go
 from typing import Dict, List, Optional
-from dash import dcc, html, Dash, Input, Output, State, no_update, ctx
+from dash import dcc, html, Dash, Input, Output, State, ctx, no_update
 import dash_bootstrap_components as dbc
 import logging
-import time
 
 from queries import QueryService
 from server import server
 from utils import (
+    build_standard_map,
     build_map_figure,
     get_new_facility_rows,
     get_access_pct,
@@ -509,7 +509,6 @@ app.layout = html.Div(
         dcc.Store(id="store-existing-facilities"),
         dcc.Store(id="store-accessibility-results"),
         dcc.Store(id="store-n-new",       data=0),     # current stepper value
-        dcc.Store(id="store-n-view",      data={"n": 0, "clicks": 0, "distance": 5}),
         dcc.Store(id="store-distance-km", data=5),     # selected catchment radius (5 or 10)
         dcc.Store(id="store-map-active",  data=False), # True = map showing proposed facilities
 
@@ -520,7 +519,6 @@ app.layout = html.Div(
 
                 # Left: brand
                 html.Div([
-                    # html.Div("TRIAL  ·  CSV DATA MODE", style=BADGE_STYLE),
                     html.Div(
                         "Zambia Health Access",
                         style={
@@ -593,14 +591,11 @@ app.layout = html.Div(
                         "overflow": "hidden",
                         "backgroundColor": "#EEF0F4",
                     },
-                    children=dcc.Graph(
-                        id="map-graph",
-                        config={
-                            "displayModeBar": False,
-                            "scrollZoom": True,
-                        },
-                        style={"width": "100%", "height": f"calc(100vh - {HEADER_H}px)"},
-                    ),
+                    # map-container is populated by the update_map callback,
+                    # which injects a dcc.Graph with a changing `key` so React
+                    # fully unmounts and remounts the Plotly graph on every
+                    # meaningful state change — guaranteeing a true re-render.
+                    id="map-container",
                 ),
 
                 # ── RIGHT: Stats pane ─────────────────────────────────────────
@@ -861,6 +856,32 @@ app.layout = html.Div(
 )
 
 
+# ── Map graph factory ─────────────────────────────────────────────────────────
+
+def _make_graph(figure: go.Figure, key: str) -> html.Div:
+    """
+    Wrap a Plotly figure in a div with a unique `key` to force React remount.
+
+    React uses `key` to decide whether a component is the same element or a
+    new one.  When `key` changes, React unmounts the old div and mounts
+    a brand-new one — guaranteeing that Plotly initialises fresh instead of
+    trying to diff/patch the existing MapLibre instance.
+
+    This is the only reliable way to force a true re-render of go.Scattermap
+    when trace structure or underlying map state may have drifted from what
+    Plotly.react() expects.
+    """
+    return html.Div(
+        key=key,
+        children=dcc.Graph(
+            id="map-graph",
+            figure=figure,
+            config={"displayModeBar": False, "scrollZoom": True},
+            style={"width": "100%", "height": f"calc(100vh - {HEADER_H}px)"},
+        ),
+    )
+
+
 # ── Callbacks ─────────────────────────────────────────────────────────────────
 
 @app.callback(
@@ -868,7 +889,7 @@ app.layout = html.Div(
     Input("store-existing-facilities", "data"),
 )
 def fetch_existing_facilities_once(data):
-    """Loads existing facilities into cache once."""
+    """Load existing facilities from CSV on first render; never re-query."""
     if data is None:
         df = db.get_existing_facilities()
         return df.to_dict("records")
@@ -880,6 +901,7 @@ def fetch_existing_facilities_once(data):
     Input("store-distance-km", "data"),
 )
 def fetch_accessibility_results(distance_km):
+    """Re-fetch optimisation results whenever the catchment radius changes."""
     df = db.get_accessibility_results_by_distance(int(distance_km or 10))
     return df.to_dict("records")
 
@@ -889,6 +911,7 @@ def fetch_accessibility_results(distance_km):
     Input("dropdown-distance-km", "value"),
 )
 def sync_distance_store(value):
+    """Persist the selected catchment radius into the store."""
     return int(value or 5)
 
 
@@ -899,7 +922,7 @@ def sync_distance_store(value):
     prevent_initial_call=True,
 )
 def reset_on_distance_change(distance_km):
-    """Resets everything when 5km/10km is toggled."""
+    """On distance switch: reset stepper to 0 and deactivate map."""
     return 0, False
 
 
@@ -908,6 +931,7 @@ def reset_on_distance_change(distance_km):
     Input("store-distance-km", "data"),
 )
 def update_distance_value_label(distance_km):
+    """Keep the 'X km' label in the Current Accessibility description in sync."""
     return f"{int(distance_km or 10)} km"
 
 
@@ -920,7 +944,11 @@ def update_distance_value_label(distance_km):
     State("store-distance-km",            "data"),
 )
 def sync_stepper_display(n_new, results_records, existing_records, distance_km):
-    """Updates the labels in the stepper boxes."""
+    """
+    Keep the two stepper displays in sync with store-n-new at all times.
+    Fires whenever store-n-new changes — including external resets from
+    'Clear map' or distance switches — not just from +/- button presses.
+    """
     n_new    = n_new or 0
     baseline = _get_baseline(distance_km)
 
@@ -943,16 +971,21 @@ def sync_stepper_display(n_new, results_records, existing_records, distance_km):
     Input("btn-decrease-2", "n_clicks"),
     State("store-n-new", "data"),
 )
-def update_stepper_value(inc, dec, inc2, dec2, current):
-    """Handles all + and - buttons."""
+def update_stepper(inc, dec, inc2, dec2, current):
+    """
+    Handle +/- button clicks — only updates store-n-new.
+    Display sync is handled separately by sync_stepper_display.
+    """
+    from dash import ctx
     triggered = ctx.triggered_id
-    if not triggered: return no_update
-    
+
     n = current if current is not None else 0
+
     if triggered in ("btn-increase", "btn-increase-2"):
         n = min(n + 1, MAX_NEW_FACILITIES)
     elif triggered in ("btn-decrease", "btn-decrease-2"):
         n = max(n - 1, 0)
+
     return n
 
 @app.callback(
@@ -962,70 +995,147 @@ def update_stepper_value(inc, dec, inc2, dec2, current):
     State("store-map-active",  "data"),
     prevent_initial_call=True,
 )
-def handle_main_button(n_clicks, is_active):
+def handle_button_click(n_clicks, is_active):
     """
-    Handles 'View Locations' and 'Clear map'.
-    If 'Clear map' is clicked (is_active is True), reset n_new to 0.
+    Toggle store-map-active on every button press.
+    'View locations' (is_active=False) → True
+    'Clear map'      (is_active=True)  → False, reset stepper to 0
     """
     if is_active:
-        # User clicked "Clear map"
-        return False, 0
-    else:
-        # User clicked "View Locations"
-        return True, no_update
+        return False, 0       # Clear map: deactivate + reset stepper
+    return True, no_update    # View locations: activate, leave stepper alone
+
+
+# @app.callback(
+#     Output("store-map-active", "data", allow_duplicate=True),
+#     Input("store-n-new", "data"),
+#     State("store-map-active", "data"),
+#     prevent_initial_call=True,
+# )
+# def auto_clear_on_stepper_change(n_new, is_active):
+#     """Auto-deactivate map when the user adjusts the stepper — keeps display in sync."""
+#     if is_active:
+#         return False
+#     return no_update
 
 
 @app.callback(
     Output("btn-view-locations", "children"),
     Output("btn-view-locations", "disabled"),
     Output("btn-view-locations", "style"),
-    Input("store-map-active", "data"),
-    Input("store-n-new", "data"),
+    Input("store-map-active",            "data"),
+    Input("store-n-new",                 "data"),
+    Input("store-accessibility-results", "data"),
+    State("store-existing-facilities",   "data"),
+    State("store-distance-km",           "data"),
 )
-def update_button_appearance(is_active, n_new):
-    """Drives the Red/Blue/Gray button state."""
+def update_button(is_active, n_new, results_records, existing_records, distance_km):
+    """
+    Drive button label + style from store-map-active and stepper value.
+      is_active=True              → 'Clear map'       (red, always enabled)
+      is_active=False, n>0, valid → 'View locations'  (indigo, enabled)
+      is_active=False, n=0        → 'View locations'  (grey, disabled)
+    """
+    n_new = n_new or 0
     if is_active:
         return "Clear map", False, CLEAR_BTN_STYLE
 
-    # Not active: check if we have facilities to show
-    is_ready = (n_new or 0) > 0
+    baseline = _get_baseline(distance_km)
+    if results_records and existing_records and n_new > 0:
+        results_df = pd.DataFrame(results_records)
+        n_existing = len(pd.DataFrame(existing_records))
+        access_pct = get_access_pct(results_df, n_new, n_existing, baseline)
+        is_ready   = access_pct > baseline
+    else:
+        is_ready = False
+
     return (
         "View locations",
         not is_ready,
-        VIEW_BTN_STYLE if is_ready else VIEW_BTN_STYLE_DISABLED
+        VIEW_BTN_STYLE if is_ready else VIEW_BTN_STYLE_DISABLED,
     )
 
 
 @app.callback(
-    Output("map-graph", "figure"),
-    Input("store-map-active",           "data"),
-    Input("store-n-new",                "data"),
-    Input("store-existing-facilities",  "data"),
-    Input("store-accessibility-results","data"),
-    State("store-distance-km",          "data"),
+    Output("map-container", "children"),
+
+    Input("btn-view-locations",        "n_clicks"),
+    Input("store-existing-facilities", "data"),
+    Input("store-distance-km",         "data"),
+    Input("store-n-new",               "data"),
+
+    State("store-map-active",          "data"),
+    State("store-accessibility-results","data"),
+
+    prevent_initial_call=False,
 )
-def update_map(is_map_active, n_new, existing_records, results_records, distance_km):
+def update_map(n_clicks, existing_records, distance_km, n_new,
+               is_map_active, results_records):
+    """
+    Returns a complete dcc.Graph element (not just a figure) so that React
+    remounts the graph fresh on every meaningful state change.
+
+    The `key` on the returned dcc.Graph is what forces the remount:
+      • standard map   → key "std-{km}"         (stable: no remount on pan/zoom)
+      • optimised map  → key "opt-{km}-{n_clicks}-{n}"  (changes on every click)
+      • cleared map    → key "clr-{km}-{n_clicks}"
+
+    Since React destroys and recreates the component when key changes, Plotly
+    always initialises from scratch — no stale MapLibre layer state, no silent
+    no-ops from Plotly.react(), no frozen map.
+    """
+    km      = int(distance_km or 5)
+    n_new   = n_new or 0
+    clicks  = n_clicks or 0
+    triggered = ctx.triggered_id
+
+    # ── No data yet ───────────────────────────────────────────────────────────
     if existing_records is None:
-        return _empty_figure(500)
+        return _make_graph(_empty_figure(500), key=f"empty-{km}")
 
     existing_df = pd.DataFrame(existing_records)
-    # Generate a unique revision ID. 
-    # If map is active, it changes with n_new to force marker updates.
-    # If map is cleared, we use a timestamp to ensure it wipes clean.
-    rev_id = f"{is_map_active}-{n_new}" if is_map_active else str(time.time())
 
-    if is_map_active and results_records and (n_new or 0) > 0:
-        results_df = pd.DataFrame(results_records)
-        new_df = get_new_facility_rows(results_df, n_new)
-    else:
-        new_df = pd.DataFrame()
+    # ── Initial load / distance switch → standard map ─────────────────────────
+    if triggered in (None, "store-existing-facilities", "store-distance-km"):
+        logging.info(f"Standard map (trigger={triggered}, km={km})")
+        fig = build_standard_map(existing_df, boundary_wkt=_BOUNDARY_WKT)
+        return _make_graph(fig, key=f"std-{km}")
 
-    return build_map_figure(
-        existing_df, 
-        new_df,
-        boundary_wkt=_BOUNDARY_WKT,
-        uirevision=rev_id
-    )
+    # ── Stepper changed ────────────────────────────────────────────────────────
+    if triggered == "store-n-new":
+        if n_new == 0:
+            logging.info(f"Stepper → 0, clearing map (clicks={clicks})")
+            fig = build_standard_map(existing_df, boundary_wkt=_BOUNDARY_WKT)
+            return _make_graph(fig, key=f"clr-{km}-{clicks}")
+
+        if is_map_active and results_records:
+            results_df = pd.DataFrame(results_records)
+            new_df     = get_new_facility_rows(results_df, n_new)
+            logging.info(f"Stepper → {n_new} facilities on live map (clicks={clicks})")
+            fig = build_map_figure(existing_df, new_df, boundary_wkt=_BOUNDARY_WKT)
+            # key includes n_new so every stepper increment forces a remount
+            return _make_graph(fig, key=f"opt-{km}-{clicks}-{n_new}")
+
+        logging.info(f"Stepper → {n_new}, map not active yet (clicks={clicks})")
+        return no_update
+
+    # ── Button click ───────────────────────────────────────────────────────────
+    if triggered == "btn-view-locations":
+        viewing = not is_map_active   # state BEFORE this click
+
+        if viewing and results_records:
+            results_df = pd.DataFrame(results_records)
+            new_df     = get_new_facility_rows(results_df, n_new)
+            logging.info(f"View locations: {n_new} facilities (clicks={clicks})")
+            fig = build_map_figure(existing_df, new_df, boundary_wkt=_BOUNDARY_WKT)
+            return _make_graph(fig, key=f"opt-{km}-{clicks}-{n_new}")
+
+        logging.info(f"Clear map (clicks={clicks})")
+        fig = build_standard_map(existing_df, boundary_wkt=_BOUNDARY_WKT)
+        return _make_graph(fig, key=f"clr-{km}-{clicks}")
+
+    logging.warning(f"Unhandled trigger: {triggered}")
+    return no_update
 
 @app.callback(
     Output("ca-total-fac",        "children"),
@@ -1040,10 +1150,18 @@ def update_map(is_map_active, n_new, existing_records, results_records, distance
     Input("store-accessibility-results", "data"),
     State("store-distance-km", "data"),
 )
-def update_all_stats_and_table(n_new, existing_records, results_records, distance_km):
-    """Updates KPIs, the chart, and the recommendations table."""
+def update_stats(n_new, existing_records, results_records, distance_km):
+    """
+    Update KPI cards, accessibility chart, and recommended table on every
+    stepper change — instant feedback without touching the map.
+    """
     if existing_records is None or results_records is None:
-        return ("—", "—", "—", "—", "Loading...", _empty_figure(), build_recommended_table([]))
+        return (
+            "—", "—", "—", "—",
+            "Loading data…",
+            _empty_figure(),
+            build_recommended_table([]),
+        )
 
     n_new       = n_new or 0
     baseline    = _get_baseline(distance_km)
@@ -1054,19 +1172,23 @@ def update_all_stats_and_table(n_new, existing_records, results_records, distanc
     cur_pct     = get_access_pct(results_df, 0, n_existing, baseline)
     access_pct  = get_access_pct(results_df, n_new, n_existing, baseline)
     delta_pct   = round(access_pct - baseline, 2) if n_new > 0 else 0.0
+    total_fac   = n_existing + n_new
 
+    ca_total    = f"{n_existing:,}"
+    ca_pct      = f"{cur_pct:.2f}%"
+    om_n_new    = str(n_new)
+    om_pct      = f"{access_pct:.2f}%"
+    delta_label = (
+        "current baseline"
+        if n_new == 0
+        else f"{format_delta(delta_pct)} vs baseline"
+    )
     chart      = build_accessibility_chart(results_df, n_new, n_existing, baseline)
     table_rows = get_recommended_table_rows(results_df, n_new, baseline)
-    
-    return (
-        f"{n_existing:,}", 
-        f"{cur_pct:.2f}%", 
-        str(n_new), 
-        f"{access_pct:.2f}%", 
-        "current baseline" if n_new == 0 else f"{format_delta(delta_pct)} vs baseline",
-        chart, 
-        build_recommended_table(table_rows)
-    )
+    table      = build_recommended_table(table_rows)
+
+    return (ca_total, ca_pct, om_n_new, om_pct, delta_label, chart, table)
+
 
 if __name__ == "__main__":
     app.run(debug=True)
