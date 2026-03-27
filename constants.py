@@ -1,7 +1,7 @@
 # ── Map defaults ──────────────────────────────────────────────────────────────
 ZAMBIA_CENTER_LAT   = -13.5
 ZAMBIA_CENTER_LON   = 28.0
-MAP_ZOOM            = 6
+MAP_ZOOM            = 5.25
 
 # ── Marker sizes ──────────────────────────────────────────────────────────────
 RADIUS_EXISTING_M   = 8_000
@@ -14,8 +14,10 @@ COLOUR_NEW_RING     = "#0EA5E9"   # sky blue ring — new / proposed facilities
 
 # ── Accessibility baseline ────────────────────────────────────────────────────
 # From notebook 02_transform cell-14:  "Current population with access: X%"
-# Update this value to match your exact cell-14 printout.
-BASELINE_ACCESS_PCT = 79.31
+# Update these values to match your exact cell-14 printout for each radius.
+BASELINE_ACCESS_PCT     = 79.31   # default (10 km) — kept for backward compat
+BASELINE_ACCESS_PCT_10KM = 79.31  # 10 km catchment radius
+BASELINE_ACCESS_PCT_5KM  = 62.24  # 5 km catchment radius
 
 # ── Slider bounds ─────────────────────────────────────────────────────────────
 MAX_NEW_FACILITIES  = 50
