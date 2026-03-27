@@ -185,6 +185,34 @@ class QueryService:
         )
         return df.dropna(subset=["lat", "lon"]).reset_index(drop=True)
 
+    def get_accessibility_results_by_distance(self, distance_km: int = 10) -> pd.DataFrame:
+        """
+        Fetch optimisation results for the given catchment radius.
+        distance_km must be 5 or 10; maps to:
+          5  → lgu_accessibility_results_zmb_5km
+          10 → lgu_accessibility_results_zmb_10km
+        """
+        table = f"lgu_accessibility_results_zmb_{distance_km}km"
+        query = f"""
+            SELECT
+                total_facilities,
+                new_facility,
+                lat,
+                lon,
+                total_population_access_pct,
+                district
+            FROM {ZAMBIA_CATALOG}.{RESULTS_SCHEMA}.{table}
+            ORDER BY total_facilities ASC
+        """
+        df = self.execute_query(query)
+        df["lat"] = pd.to_numeric(df["lat"], errors="coerce")
+        df["lon"] = pd.to_numeric(df["lon"], errors="coerce")
+        df["district"] = df["district"].fillna("—")
+        df["total_population_access_pct"] = pd.to_numeric(
+            df["total_population_access_pct"], errors="coerce"
+        )
+        return df.dropna(subset=["lat", "lon"]).reset_index(drop=True)
+
     def get_user_credentials(self) -> Dict[str, str]:              # ← Dict from typing
         query = f"""
             SELECT username, password_hash
@@ -192,3 +220,26 @@ class QueryService:
         """
         df = self.execute_query(query)
         return dict(zip(df["username"], df["password_hash"]))
+    
+    def get_gadm_boundary_wkt(self) -> Optional[str]:
+        """
+        Return the Zambia national boundary geometry as a WKT string.
+
+        The gadm_boundaries_zmb table contains the country-level (GADM level-0)
+        polygon(s).  We take the first row; for a single-country dashboard this
+        is always the full national boundary.
+        """
+        query = f"""
+            SELECT geometry_wkt
+            FROM {ZAMBIA_CATALOG}.{FACILITIES_SCHEMA}.gadm_boundaries_zmb
+            LIMIT 1
+        """
+        df = self.execute_query(query)
+        if df.empty:
+            logging.warning("gadm_boundaries_zmb returned no rows")
+            return None
+        val = df["geometry_wkt"].iloc[0]
+        if val is None:
+            logging.warning("gadm_boundaries_zmb geometry_wkt is NULL")
+            return None
+        return str(val)
