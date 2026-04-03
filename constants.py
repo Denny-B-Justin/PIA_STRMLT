@@ -18,6 +18,8 @@ COLOUR_NEW_RING     = "#0EA5E9"   # sky blue ring — new / proposed facilities
 BASELINE_ACCESS_PCT     = 79.31   # default (10 km) — kept for backward compat
 BASELINE_ACCESS_PCT_10KM = 79.31  # 10 km catchment radius
 BASELINE_ACCESS_PCT_5KM  = 62.24  # 5 km catchment radius
+BASELINE_ACCESS_PCT_30MIN = 39.52  # 30 min walking travel time
+BASELINE_ACCESS_PCT_1HR   = 56.36  # 1 hr  walking travel time
 
 # ── Slider bounds ─────────────────────────────────────────────────────────────
 MAX_NEW_FACILITIES  = 50
