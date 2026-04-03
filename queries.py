@@ -162,6 +162,7 @@ class QueryService:
         df["lat"]  = pd.to_numeric(df["lat"],  errors="coerce")
         df["lon"]  = pd.to_numeric(df["lon"],  errors="coerce")
         df["name"] = df["name"].fillna("Health Facility")
+        logging.info("Fetched %d existing facilities", len(df))
         return df.dropna(subset=["lat", "lon"]).reset_index(drop=True)
 
     def get_accessibility_results(self) -> pd.DataFrame:
@@ -185,14 +186,18 @@ class QueryService:
         )
         return df.dropna(subset=["lat", "lon"]).reset_index(drop=True)
 
-    def get_accessibility_results_by_distance(self, distance_km: int = 10) -> pd.DataFrame:
+    def get_accessibility_results_by_distance(self, distance_km=10) -> pd.DataFrame:
         """
-        Fetch optimisation results for the given catchment radius.
-        distance_km must be 5 or 10; maps to:
-          5  → lgu_accessibility_results_zmb_5km
-          10 → lgu_accessibility_results_zmb_10km
+        Fetch optimisation results for the given catchment radius or travel-time band.
+        Accepted values and their table mappings:
+          5       → lgu_accessibility_results_zmb_5km
+          10      → lgu_accessibility_results_zmb_10km
+          "30min" → lgu_accessibility_results_zmb_30min
+          "1hr"   → lgu_accessibility_results_zmb_1hr
         """
-        table = f"lgu_accessibility_results_zmb_{distance_km}km"
+        _table_suffix_map = {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"}
+        suffix = _table_suffix_map.get(distance_km, "10km")
+        table = f"lgu_accessibility_results_zmb_{suffix}"
         query = f"""
             SELECT
                 total_facilities,
