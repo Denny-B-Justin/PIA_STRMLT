@@ -33,6 +33,8 @@ from constants import (
     BASELINE_ACCESS_PCT,
     BASELINE_ACCESS_PCT_5KM,
     BASELINE_ACCESS_PCT_10KM,
+    BASELINE_ACCESS_PCT_30MIN,
+    BASELINE_ACCESS_PCT_1HR,
     MAX_NEW_FACILITIES,
 )
 
@@ -53,8 +55,14 @@ app = Dash(
 db = QueryService.get_instance()
 
 def _get_baseline(distance_km) -> float:
-    """Return the correct baseline access % for the selected catchment radius."""
-    return BASELINE_ACCESS_PCT_5KM if int(distance_km or 10) == 5 else BASELINE_ACCESS_PCT_10KM
+    """Return the correct baseline access % for the selected catchment radius or travel-time band."""
+    if distance_km == "30min":
+        return BASELINE_ACCESS_PCT_30MIN
+    if distance_km == "1hr":
+        return BASELINE_ACCESS_PCT_1HR
+    if distance_km == 5 or distance_km == "5":
+        return BASELINE_ACCESS_PCT_5KM
+    return BASELINE_ACCESS_PCT_10KM
 
 _BOUNDARY_WKT: Optional[str] = None
 try:
@@ -408,7 +416,7 @@ def filter_chip(label: str, value: str) -> html.Div:
     )
 
 
-def filter_dropdown(label: str, options: list, value, dropdown_id: str) -> html.Div:
+def filter_dropdown(label: str, options: list, value, dropdown_id: str, disabled: bool = False) -> html.Div:
     """Interactive filter dropdown styled to match the existing filter chips."""
     return html.Div(
         style={"display": "flex", "flexDirection": "column"},
@@ -420,6 +428,7 @@ def filter_dropdown(label: str, options: list, value, dropdown_id: str) -> html.
                 value=value,
                 clearable=False,
                 searchable=False,
+                disabled=disabled,
                 style={
                     "minWidth": "130px",
                     "fontSize": "0.84rem",
@@ -427,7 +436,7 @@ def filter_dropdown(label: str, options: list, value, dropdown_id: str) -> html.
                     "fontWeight": "500",
                     "color": TEXT_HI,
                     "borderRadius": "8px",
-                    "cursor": "pointer",
+                    "cursor": "pointer" if not disabled else "default",
                 },
             ),
         ],
@@ -615,10 +624,27 @@ app.layout = html.Div(
                             style=FILTER_BAR_STYLE,
                             children=[
                                 filter_chip("Type of facility",  "Hospitals and Clinics"),
-                                filter_chip("Travel mode",       "Driving"),
-                                filter_chip("Measure",           "Distance"),
                                 filter_dropdown(
-                                    "Distance value",
+                                    "Travel mode",
+                                    options=[
+                                        {"label": "Driving", "value": "Driving"},
+                                        {"label": "Walking", "value": "Walking"},
+                                    ],
+                                    value="Driving",
+                                    dropdown_id="dropdown-travel-mode",
+                                ),
+                                filter_dropdown(
+                                    "Measure",
+                                    options=[
+                                        {"label": "Distance", "value": "Distance"},
+                                        {"label": "Time",     "value": "Time"},
+                                    ],
+                                    value="Distance",
+                                    dropdown_id="dropdown-measure",
+                                    disabled=True,
+                                ),
+                                filter_dropdown(
+                                    "Value",
                                     options=[
                                         {"label": "5 km",  "value": 5},
                                         {"label": "10 km", "value": 10},
@@ -665,9 +691,10 @@ app.layout = html.Div(
                                                         },
                                                     ),
                                                     html.Div(
-                                                        [
+                                                        [\
                                                             "Percentage of population with access to ", html.I("all"), " health facilities within ",
-                                                            html.U(id="distance-value-label", children="5 km"), " travel ", html.I("distance")," by driving",
+                                                            html.U(id="distance-value-label", children="5 km"), " travel ",
+                                                            html.Span(id="travel-mode-description", children=[html.I("distance"), " by driving"]),
                                                         ],
                                                         style=BIG_NUM_LABEL_STYLE,
                                                     ),
@@ -901,8 +928,8 @@ def fetch_existing_facilities_once(data):
     Input("store-distance-km", "data"),
 )
 def fetch_accessibility_results(distance_km):
-    """Re-fetch optimisation results whenever the catchment radius changes."""
-    df = db.get_accessibility_results_by_distance(int(distance_km or 10))
+    """Re-fetch optimisation results whenever the catchment radius / travel-time band changes."""
+    df = db.get_accessibility_results_by_distance(distance_km if distance_km is not None else 10)
     return df.to_dict("records")
 
 
@@ -911,8 +938,8 @@ def fetch_accessibility_results(distance_km):
     Input("dropdown-distance-km", "value"),
 )
 def sync_distance_store(value):
-    """Persist the selected catchment radius into the store."""
-    return int(value or 5)
+    """Persist the selected catchment radius / travel-time band into the store."""
+    return value if value is not None else 5
 
 
 @app.callback(
@@ -931,8 +958,51 @@ def reset_on_distance_change(distance_km):
     Input("store-distance-km", "data"),
 )
 def update_distance_value_label(distance_km):
-    """Keep the 'X km' label in the Current Accessibility description in sync."""
-    return f"{int(distance_km or 10)} km"
+    """Keep the value label in the Current Accessibility description in sync."""
+    label_map = {5: "5 km", 10: "10 km", "30min": "30 min", "1hr": "1 hr"}
+    return label_map.get(distance_km, "10 km")
+
+
+@app.callback(
+    Output("dropdown-measure", "value"),
+    Input("dropdown-travel-mode", "value"),
+)
+def update_measure_on_travel_mode(travel_mode):
+    """Auto-set the Measure dropdown whenever Travel mode changes."""
+    return "Distance" if travel_mode == "Driving" else "Time"
+
+
+@app.callback(
+    Output("dropdown-distance-km", "options"),
+    Output("dropdown-distance-km", "value"),
+    Input("dropdown-travel-mode", "value"),
+)
+def update_value_dropdown_on_travel_mode(travel_mode):
+    """
+    Swap the Value dropdown options and reset its selection when Travel mode changes.
+      Driving → 5 km / 10 km  (default 5 km)
+      Walking → 30 min / 1 hr (default 30 min)
+    """
+    if travel_mode == "Walking":
+        return [
+            {"label": "30 min", "value": "30min"},
+            {"label": "1 hr",   "value": "1hr"},
+        ], "30min"
+    return [
+        {"label": "5 km",  "value": 5},
+        {"label": "10 km", "value": 10},
+    ], 5
+
+
+@app.callback(
+    Output("travel-mode-description", "children"),
+    Input("dropdown-travel-mode", "value"),
+)
+def update_travel_mode_description(travel_mode):
+    """Update the italicised measure/mode text in the Current Accessibility description."""
+    if travel_mode == "Walking":
+        return [html.I("time"), " by walking"]
+    return [html.I("distance"), " by driving"]
 
 
 @app.callback(
@@ -1040,14 +1110,12 @@ def update_button(is_active, n_new, results_records, existing_records, distance_
     if is_active:
         return "Clear map", False, CLEAR_BTN_STYLE
 
-    baseline = _get_baseline(distance_km)
-    if results_records and existing_records and n_new > 0:
-        results_df = pd.DataFrame(results_records)
-        n_existing = len(pd.DataFrame(existing_records))
-        access_pct = get_access_pct(results_df, n_new, n_existing, baseline)
-        is_ready   = access_pct > baseline
-    else:
-        is_ready = False
+    # Enable as soon as data is loaded and n_new > 0.
+    # Comparing access_pct > baseline is intentionally omitted here: for walking-mode
+    # tables the total_facilities column may not share the same base count as the
+    # driving facilities table, so get_access_pct falls back to row-n of the results
+    # and can return a value below baseline even when the optimisation is valid.
+    is_ready = bool(results_records) and n_new > 0
 
     return (
         "View locations",
@@ -1084,7 +1152,7 @@ def update_map(n_clicks, existing_records, distance_km, n_new,
     always initialises from scratch — no stale MapLibre layer state, no silent
     no-ops from Plotly.react(), no frozen map.
     """
-    km      = int(distance_km or 5)
+    km      = distance_km or 5
     n_new   = n_new or 0
     clicks  = n_clicks or 0
     triggered = ctx.triggered_id
