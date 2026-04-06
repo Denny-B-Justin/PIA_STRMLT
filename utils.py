@@ -12,6 +12,11 @@ Map approach change:
 Chart x-axis:
   X-axis now shows actual total_facilities values from the results table
   (e.g. 80 → 110) rather than a 0-based new-facility count.
+
+2025-07 revision:
+  build_standard_map and build_map_figure now accept dynamic center_lat,
+  center_lon, and zoom parameters so the map re-centres when the user
+  switches between the country view and a province view.
 """
 import logging
 import pandas as pd
@@ -29,6 +34,7 @@ ZAMBIA_POPULATION = 21_559_131
 
 _CLR_BOUNDARY      = "#F97316"               # orange line
 _CLR_BOUNDARY_FILL = "rgba(249,115,22,0.05)" # light beige/orange fill (low opacity)
+
 # ── DMS conversion ────────────────────────────────────────────────────────────
 def _boundary_wkt_to_coords(wkt_str: str) -> Tuple[List, List]:
     """
@@ -95,11 +101,18 @@ def build_standard_map(
     boundary_wkt: Optional[str] = None,
     map_height_px: Optional[int] = None,
     uirevision: str = "standard",
+    center_lat: float = ZAMBIA_CENTER_LAT,
+    center_lon: float = ZAMBIA_CENTER_LON,
+    zoom: float = MAP_ZOOM,
 ) -> go.Figure:
     """
-    Build the baseline map: Zambia boundary + existing health facilities only.
-    No proposed facilities.  Called on initial load, Clear Map, and distance
-    switches — any state where only ground-truth data should be visible.
+    Build the baseline map: boundary + existing health facilities only.
+    No proposed facilities.  Called on initial load, Clear Map, distance
+    switches, and location switches — any state where only ground-truth
+    data should be visible.
+
+    center_lat / center_lon / zoom are dynamic so the map re-centres when
+    the user switches from the whole-country view to a province view.
 
     Returns a fully configured go.Figure ready to hand to dcc.Graph.
     """
@@ -151,8 +164,8 @@ def build_standard_map(
     layout_kwargs = dict(
         map_style="open-street-map",
         map=dict(
-            center=dict(lat=ZAMBIA_CENTER_LAT, lon=ZAMBIA_CENTER_LON),
-            zoom=MAP_ZOOM,
+            center=dict(lat=center_lat, lon=center_lon),
+            zoom=zoom,
         ),
         margin=dict(l=0, r=0, t=0, b=0),
         showlegend=False,
@@ -179,6 +192,9 @@ def build_map_figure(
     boundary_wkt: Optional[str] = None,
     map_height_px: Optional[int] = None,
     uirevision: str = "map",
+    center_lat: float = ZAMBIA_CENTER_LAT,
+    center_lon: float = ZAMBIA_CENTER_LON,
+    zoom: float = MAP_ZOOM,
 ) -> go.Figure:
     """
     Build the full optimisation map: existing facilities + proposed facilities.
@@ -194,6 +210,9 @@ def build_map_figure(
         boundary_wkt=boundary_wkt,
         map_height_px=map_height_px,
         uirevision=uirevision,
+        center_lat=center_lat,
+        center_lon=center_lon,
+        zoom=zoom,
     )
 
     # ── Proposed facilities (hollow numbered circles) ─────────────────────────
@@ -205,21 +224,13 @@ def build_map_figure(
     # structural change it cannot process via react() and silently keeps the
     # old layers.  The frontend appears frozen even though the callback ran.
     #
-    # Previous approach (Layer C = one trace PER facility) meant:
-    #   3 proposed → 8 total traces
-    #   4 proposed → 9 total traces   ← react() fails, map doesn't update
-    #
     # Fix: exactly 3 proposed-facility traces regardless of N:
     #   Layer A — one marker trace,  all N green outer rings
     #   Layer B — one marker trace,  all N white inner fills  (hollow effect)
     #   Layer C — ONE text trace,    all N number labels
     #
-    # Because proposed facilities are always geographically dispersed across
-    # Zambia, MapLibre's label-collision suppression does not hide any labels.
     # Total trace count with boundary = 6, without boundary = 4 — always fixed.
 
-    # Always add the three proposed-facility traces (empty when new_df is empty
-    # so the count stays fixed and react() can safely diff data-only changes).
     hover_texts = [
         f"<b>Proposed Facility #{i + 1}</b><br>"
         f"ID: {row.get('new_facility', 'N/A')}<br>"
@@ -274,6 +285,29 @@ def get_new_facility_rows(results_df: pd.DataFrame, n: int) -> pd.DataFrame:
     return results_df.head(n).copy()
 
 
+def get_true_baseline(results_df: pd.DataFrame, n_existing: int,
+                      fallback_pct: float = BASELINE_ACCESS_PCT) -> float:
+    """
+    Return the true baseline accessibility % from the results table.
+
+    Looks for the row where total_facilities == n_existing (i.e. zero new
+    facilities added).  Falls back to the first row value, then to the
+    hardcoded fallback constant.  This must be used instead of the externally-
+    supplied baseline_pct wherever the chart or KPI cards need the baseline,
+    because the external value can be scoped to the wrong location (e.g. the
+    national figure while a province is selected).
+    """
+    if results_df.empty:
+        return fallback_pct
+    exact = results_df.loc[
+        results_df["total_facilities"] == n_existing,
+        "total_population_access_pct",
+    ]
+    if not exact.empty:
+        return float(exact.iloc[0])
+    return float(results_df["total_population_access_pct"].iloc[0])
+
+
 def get_access_pct(
     results_df: pd.DataFrame,
     n: int,
@@ -282,10 +316,17 @@ def get_access_pct(
 ) -> float:
     """
     Look up accessibility % for (n_existing + n) total facilities.
-    Returns baseline_pct when n == 0.
+    Returns the true DB baseline when n == 0 (derived from results_df row
+    where total_facilities == n_existing), falling back to baseline_pct only
+    when results_df is empty.
     """
-    if n == 0 or results_df.empty:
+    if results_df.empty:
         return baseline_pct
+
+    true_base = get_true_baseline(results_df, n_existing, baseline_pct)
+
+    if n == 0:
+        return true_base
 
     target = n_existing + n
     exact  = results_df.loc[
@@ -296,7 +337,7 @@ def get_access_pct(
         return float(exact.iloc[0])
 
     fallback = results_df.head(n)["total_population_access_pct"]
-    return float(fallback.iloc[-1]) if not fallback.empty else BASELINE_ACCESS_PCT
+    return float(fallback.iloc[-1]) if not fallback.empty else true_base
 
 
 def format_delta(delta: float) -> str:
@@ -316,16 +357,53 @@ def build_accessibility_chart(
     """
     Smooth line chart: total_population_access_pct (Y) vs total_facilities (X).
 
-    X-axis uses actual total_facilities column values (e.g. 80 → 110),
+    X-axis uses actual total_facilities column values (e.g. 163 → 222),
     starting from n_existing (baseline) rather than 0.
     The highlighted dot marks the currently selected slider position.
+
+    Baseline anchor fix: the first chart point always uses the true DB baseline
+    — the total_population_access_pct at total_facilities == n_existing (i.e.
+    zero new facilities added).  We no longer inject the externally-supplied
+    baseline_pct as a synthetic first point, because that value can come from
+    the wrong scope (e.g. national fallback while a province is selected) and
+    produces an abrupt near-vertical spike at the left edge of the chart.
+
+    The externally-supplied baseline_pct is kept only as a last-resort fallback
+    when the results table is empty.
     """
-    # Include baseline as the first point (n_existing facilities, baseline %)
-    x_vals = [n_existing] + list(results_df["total_facilities"])
-    y_vals = [baseline_pct] + list(results_df["total_population_access_pct"])
+    if results_df.empty:
+        # Nothing to plot — return a flat baseline line
+        x_vals = [n_existing]
+        y_vals = [baseline_pct]
+        true_baseline = baseline_pct
+    else:
+        # Derive the true baseline directly from the results table:
+        # the row where total_facilities equals n_existing represents the
+        # accessibility BEFORE any new facility is added for this province/scope.
+        baseline_row = results_df.loc[
+            results_df["total_facilities"] == n_existing,
+            "total_population_access_pct",
+        ]
+        if not baseline_row.empty:
+            true_baseline = float(baseline_row.iloc[0])
+        else:
+            # Fallback: use the first row's value (smallest total_facilities)
+            true_baseline = float(results_df["total_population_access_pct"].iloc[0])
+
+        x_vals = list(results_df["total_facilities"])
+        y_vals = list(results_df["total_population_access_pct"])
+
+        # Prepend baseline anchor only if n_existing is not already the first x
+        if x_vals[0] != n_existing:
+            x_vals = [n_existing] + x_vals
+            y_vals = [true_baseline] + y_vals
 
     current_x = n_existing + n_new
-    current_y = get_access_pct(results_df, n_new, n_existing, baseline_pct)
+    current_y = (
+        true_baseline
+        if n_new == 0
+        else get_access_pct(results_df, n_new, n_existing, true_baseline)
+    )
 
     y_min = round(min(y_vals) - 0.5, 1)
     y_max = round(max(y_vals) + 0.5, 1)
