@@ -109,10 +109,10 @@ except Exception as _e:
 # The separator is disabled so it cannot be selected.
 
 LOCATION_DROPDOWN_OPTIONS = [
-    {"label": "🌍  Zambia", "value": "zambia"},
+    {"label": "Zambia", "value": "zambia"},
     {"label": "── Provinces ──", "value": "_sep", "disabled": True},
 ] + [
-    {"label": f"    {p}", "value": p}
+    {"label": f"      {p}", "value": p}
     for p in PROVINCES
 ]
 
@@ -609,7 +609,7 @@ app.layout = html.Div(
                             style={"display": "flex", "flexDirection": "column"},
                             children=[
                                 html.Span(
-                                    "Location",
+                                    # "Location",
                                     style={
                                         **FILTER_FIELD_LABEL,
                                         "marginBottom": "3px",
@@ -759,7 +759,10 @@ app.layout = html.Div(
                                                         style=BIG_NUM_STYLE,
                                                     ),
                                                     html.Div(
-                                                        "Number of health facilities",
+                                                        [
+                                                            "Number of health facilities in ",
+                                                            html.Span(id="ca-location-label", children="Zambia"),
+                                                        ],
                                                         style=BIG_NUM_LABEL_STYLE,
                                                     ),
                                                 ]),
@@ -775,7 +778,9 @@ app.layout = html.Div(
                                                         [
                                                             "Percentage of population with access to ",
                                                             html.I("all"),
-                                                            " health facilities within ",
+                                                            " health facilities in ",
+                                                            html.Span(id="location-label-detail", children="Zambia"),
+                                                            " within ",
                                                             html.U(id="distance-value-label", children="5 km"),
                                                             " travel ",
                                                             html.Span(
@@ -1026,7 +1031,7 @@ def fetch_base_data(location, distance_km):
         }
 
 
-# ── 3. Fetch existing facilities (re-fetch on location change) ────────────────
+# ── 3. Fetch existing facilities (province-scoped on location change) ─────────
 
 @app.callback(
     Output("store-existing-facilities", "data"),
@@ -1034,12 +1039,30 @@ def fetch_base_data(location, distance_km):
 )
 def fetch_existing_facilities(location):
     """
-    Load existing health facilities.  Currently returns all Zambia facilities
-    for every location (the boundary and zoom handle visual scoping).
-    Cached by QueryService so province switches after the first load are fast.
+    Load existing health facilities scoped to the selected location.
+
+    When location == "zambia" the full national table is queried.
+    For any province the dedicated per-province OSM table is used:
+        health_facilities_zmb_osm_{slug}_province
+
+    This means the map, the KPI count ("Number of health facilities"), and
+    the baseline facility count used by the accessibility chart all reflect
+    only the facilities that actually belong to the selected province —
+    eliminating the whole-country scatter bleed visible in the earlier build.
+
+    QueryService caches each table result independently, so switching
+    between provinces after the first load is near-instant.
     """
-    df = db.get_existing_facilities()
-    return df.to_dict("records")
+    loc = location or "zambia"
+    try:
+        df = db.get_existing_facilities_for_location(loc)
+        logging.info("Loaded %d facilities for location='%s'", len(df), loc)
+        return df.to_dict("records")
+    except Exception as exc:
+        logging.error(
+            "fetch_existing_facilities error for location='%s': %s", loc, exc
+        )
+        return []
 
 
 # ── 4. Fetch MCLP optimisation results ───────────────────────────────────────
@@ -1166,6 +1189,33 @@ def update_legend_boundary_label(location):
     if not location or location == "zambia":
         return "Zambia boundary"
     return f"{location} boundary"
+
+
+# ── 12b. Location label in Current Accessibility description ────────────────────
+
+@app.callback(
+    Output("location-label-detail", "children"),
+    Input("store-location", "data"),
+)
+def update_location_label_detail(location):
+    """Display the selected location (country or province) in the accessibility label."""
+    if not location or location == "zambia":
+        return "Zambia"
+    # Format province name: capitalize first letter of each word
+    return location.title()
+
+
+# ── 12c. Location label in Current Accessibility (facilities count) ────────────
+
+@app.callback(
+    Output("ca-location-label", "children"),
+    Input("store-location", "data"),
+)
+def update_ca_location_label(location):
+    """Display the selected location in the facilities count label."""
+    if not location or location == "zambia":
+        return "Zambia"
+    return location.title()
 
 
 # ── 13. Stepper: +/- buttons update store-n-new ──────────────────────────────

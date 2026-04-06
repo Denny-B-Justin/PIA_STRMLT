@@ -2,7 +2,7 @@
 ZAMBIA_CENTER_LAT   = -13.5
 ZAMBIA_CENTER_LON   = 28.0
 MAP_ZOOM            = 5.25
-PROVINCE_ZOOM       = 6.0          # default zoom when a province is selected
+PROVINCE_ZOOM       = 6.5          # default zoom when a province is selected
 
 # ── Province list and slug mapping ────────────────────────────────────────────
 PROVINCES = [

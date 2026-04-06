@@ -172,16 +172,55 @@ class QueryService:
     # ── Domain queries ────────────────────────────────────────────────────────
 
     def get_existing_facilities(self) -> pd.DataFrame:
+        """
+        Backward-compat wrapper — returns all national facilities.
+        Prefer get_existing_facilities_for_location() for province-scoped views.
+        """
+        return self.get_existing_facilities_for_location("zambia")
+
+    def get_existing_facilities_for_location(self, location: str = "zambia") -> pd.DataFrame:
+        """
+        Fetch existing health facilities for the given location.
+
+        Table resolution:
+          Zambia (country)  → health_facilities_zmb
+          Province          → health_facilities_zmb_osm_{slug}_province
+
+        Each province has its own dedicated OSM-derived facility table so that
+        the map only shows facilities relevant to the selected province — no
+        country-wide scatter bleed.
+
+        location: "zambia" for the full national table, or a province display
+                  name (e.g. "Central", "North-Western") for the province table.
+        """
+        from constants import PROVINCE_SLUGS
+
+        loc = (location or "zambia").strip()
+
+        if loc.lower() == "zambia":
+            table = "health_facilities_zmb"
+        else:
+            slug  = PROVINCE_SLUGS.get(
+                loc,
+                loc.lower().replace("-", "").replace(" ", "_"),
+            )
+            table = f"health_facilities_zmb_osm_{slug}_province"
+
+        logging.info("Fetching existing facilities from table: %s", table)
+
         query = f"""
             SELECT id, lat, lon, name
-            FROM {ZAMBIA_CATALOG}.{FACILITIES_SCHEMA}.health_facilities_zmb
+            FROM {ZAMBIA_CATALOG}.{FACILITIES_SCHEMA}.{table}
             ORDER BY id ASC
         """
         df = self.execute_query(query)
         df["lat"]  = pd.to_numeric(df["lat"],  errors="coerce")
         df["lon"]  = pd.to_numeric(df["lon"],  errors="coerce")
         df["name"] = df["name"].fillna("Health Facility")
-        logging.info("Fetched %d existing facilities", len(df))
+        logging.info(
+            "Fetched %d existing facilities for location='%s' (table=%s)",
+            len(df), loc, table,
+        )
         return df.dropna(subset=["lat", "lon"]).reset_index(drop=True)
 
     def get_accessibility_results(self) -> pd.DataFrame:
