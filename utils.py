@@ -12,6 +12,11 @@ Map approach change:
 Chart x-axis:
   X-axis now shows actual total_facilities values from the results table
   (e.g. 80 → 110) rather than a 0-based new-facility count.
+
+2025-07 revision:
+  build_standard_map and build_map_figure now accept dynamic center_lat,
+  center_lon, and zoom parameters so the map re-centres when the user
+  switches between the country view and a province view.
 """
 import logging
 import pandas as pd
@@ -29,6 +34,7 @@ ZAMBIA_POPULATION = 21_559_131
 
 _CLR_BOUNDARY      = "#F97316"               # orange line
 _CLR_BOUNDARY_FILL = "rgba(249,115,22,0.05)" # light beige/orange fill (low opacity)
+
 # ── DMS conversion ────────────────────────────────────────────────────────────
 def _boundary_wkt_to_coords(wkt_str: str) -> Tuple[List, List]:
     """
@@ -95,11 +101,18 @@ def build_standard_map(
     boundary_wkt: Optional[str] = None,
     map_height_px: Optional[int] = None,
     uirevision: str = "standard",
+    center_lat: float = ZAMBIA_CENTER_LAT,
+    center_lon: float = ZAMBIA_CENTER_LON,
+    zoom: float = MAP_ZOOM,
 ) -> go.Figure:
     """
-    Build the baseline map: Zambia boundary + existing health facilities only.
-    No proposed facilities.  Called on initial load, Clear Map, and distance
-    switches — any state where only ground-truth data should be visible.
+    Build the baseline map: boundary + existing health facilities only.
+    No proposed facilities.  Called on initial load, Clear Map, distance
+    switches, and location switches — any state where only ground-truth
+    data should be visible.
+
+    center_lat / center_lon / zoom are dynamic so the map re-centres when
+    the user switches from the whole-country view to a province view.
 
     Returns a fully configured go.Figure ready to hand to dcc.Graph.
     """
@@ -151,8 +164,8 @@ def build_standard_map(
     layout_kwargs = dict(
         map_style="open-street-map",
         map=dict(
-            center=dict(lat=ZAMBIA_CENTER_LAT, lon=ZAMBIA_CENTER_LON),
-            zoom=MAP_ZOOM,
+            center=dict(lat=center_lat, lon=center_lon),
+            zoom=zoom,
         ),
         margin=dict(l=0, r=0, t=0, b=0),
         showlegend=False,
@@ -179,6 +192,9 @@ def build_map_figure(
     boundary_wkt: Optional[str] = None,
     map_height_px: Optional[int] = None,
     uirevision: str = "map",
+    center_lat: float = ZAMBIA_CENTER_LAT,
+    center_lon: float = ZAMBIA_CENTER_LON,
+    zoom: float = MAP_ZOOM,
 ) -> go.Figure:
     """
     Build the full optimisation map: existing facilities + proposed facilities.
@@ -194,6 +210,9 @@ def build_map_figure(
         boundary_wkt=boundary_wkt,
         map_height_px=map_height_px,
         uirevision=uirevision,
+        center_lat=center_lat,
+        center_lon=center_lon,
+        zoom=zoom,
     )
 
     # ── Proposed facilities (hollow numbered circles) ─────────────────────────
@@ -205,21 +224,13 @@ def build_map_figure(
     # structural change it cannot process via react() and silently keeps the
     # old layers.  The frontend appears frozen even though the callback ran.
     #
-    # Previous approach (Layer C = one trace PER facility) meant:
-    #   3 proposed → 8 total traces
-    #   4 proposed → 9 total traces   ← react() fails, map doesn't update
-    #
     # Fix: exactly 3 proposed-facility traces regardless of N:
     #   Layer A — one marker trace,  all N green outer rings
     #   Layer B — one marker trace,  all N white inner fills  (hollow effect)
     #   Layer C — ONE text trace,    all N number labels
     #
-    # Because proposed facilities are always geographically dispersed across
-    # Zambia, MapLibre's label-collision suppression does not hide any labels.
     # Total trace count with boundary = 6, without boundary = 4 — always fixed.
 
-    # Always add the three proposed-facility traces (empty when new_df is empty
-    # so the count stays fixed and react() can safely diff data-only changes).
     hover_texts = [
         f"<b>Proposed Facility #{i + 1}</b><br>"
         f"ID: {row.get('new_facility', 'N/A')}<br>"

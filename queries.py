@@ -1,7 +1,26 @@
 """
 queries.py
 Databricks SQL data-access layer for the Zambia Health Access dashboard.
-...
+
+Two new public methods added in this revision:
+  • get_base_dashboard_data(location, distance_km)
+        → fetches center coords, boundary WKT, baseline access %, and total
+          new facilities from base_dashboard_data_zmb for any location
+          (country or province) and distance value.
+
+  • get_accessibility_results_for_location(location, distance_km)
+        → resolves the correct result table name and fetches MCLP results.
+          Handles all 44 tables (11 sessions × 4 km bands).
+
+Table-naming convention (44 tables total):
+  Country (Zambia):
+    Driving  → lgu_accessibility_results_zmb_5km / _10km
+    Walking  → lgu_accessibility_results_zmb_30min / _1hr
+
+  Province (10 × 4):
+    Driving  → lgu_accessibility_results_zmb_{slug}_province_5km / _10km
+    Walking  → lgu_accessibility_results_zmb_{slug}_province_2km / _4km
+               (2 km ≈ 30 min walk; 4 km ≈ 1 hr walk)
 """
 
 import os
@@ -11,7 +30,7 @@ import threading
 import pandas as pd
 from databricks import sql
 from databricks.sdk.core import Config, oauth_service_principal
-from typing import Dict, Optional, Tuple  # ← all generics from typing
+from typing import Dict, Optional, Tuple
 
 try:
     from dotenv import load_dotenv
@@ -80,12 +99,12 @@ class QueryService:
 
     def __init__(self):
         # {sql_string: (expires_at_epoch, dataframe)}
-        self._cache: Dict[str, Tuple[float, pd.DataFrame]] = {}  # ← Dict/Tuple from typing
+        self._cache: Dict[str, Tuple[float, pd.DataFrame]] = {}
         self._lock  = threading.Lock()
 
     # ── Cache helpers ──────────────────────────────────────────────────────────
 
-    def _cache_get(self, key: str) -> Optional[pd.DataFrame]:          # ← Optional (already correct)
+    def _cache_get(self, key: str) -> Optional[pd.DataFrame]:
         now = time.time()
         with self._lock:
             entry = self._cache.get(key)
@@ -166,38 +185,141 @@ class QueryService:
         return df.dropna(subset=["lat", "lon"]).reset_index(drop=True)
 
     def get_accessibility_results(self) -> pd.DataFrame:
-        query = f"""
-            SELECT
-                total_facilities,
-                new_facility,
-                lat,
-                lon,
-                total_population_access_pct,
-                district
-            FROM {ZAMBIA_CATALOG}.{RESULTS_SCHEMA}.lgu_accessibility_results_zmb_10km
-            ORDER BY total_facilities ASC
-        """
-        df = self.execute_query(query)
-        df["lat"] = pd.to_numeric(df["lat"], errors="coerce")
-        df["lon"] = pd.to_numeric(df["lon"], errors="coerce")
-        df["district"] = df["district"].fillna("—")
-        df["total_population_access_pct"] = pd.to_numeric(
-            df["total_population_access_pct"], errors="coerce"
-        )
-        return df.dropna(subset=["lat", "lon"]).reset_index(drop=True)
+        """Backward-compat wrapper — fetches the default 10 km Zambia results."""
+        return self.get_accessibility_results_for_location("zambia", 10)
 
     def get_accessibility_results_by_distance(self, distance_km=10) -> pd.DataFrame:
+        """Backward-compat wrapper — fetches Zambia-level results for the given distance."""
+        return self.get_accessibility_results_for_location("zambia", distance_km)
+
+    # ── NEW: location-aware queries ───────────────────────────────────────────
+
+    def get_base_dashboard_data(
+        self,
+        location: str = "zambia",
+        distance_km=5,
+    ) -> dict:
         """
-        Fetch optimisation results for the given catchment radius or travel-time band.
-        Accepted values and their table mappings:
-          5       → lgu_accessibility_results_zmb_5km
-          10      → lgu_accessibility_results_zmb_10km
-          "30min" → lgu_accessibility_results_zmb_30min
-          "1hr"   → lgu_accessibility_results_zmb_1hr
+        Fetch map-center coordinates, boundary WKT, baseline access %, and
+        total new facilities from base_dashboard_data_zmb for the given
+        location and distance value.
+
+        location   : "zambia" for the whole country; province display name
+                     (e.g. "Lusaka", "Central") for a province view.
+        distance_km: 5 | 10 | "30min" | "1hr"
+
+        Returns a plain dict with keys:
+          center_lat, center_lon, zoom, geometry_wkt,
+          current_access, total_new_facilities, location
         """
-        _table_suffix_map = {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"}
-        suffix = _table_suffix_map.get(distance_km, "10km")
-        table = f"lgu_accessibility_results_zmb_{suffix}"
+        from constants import (
+            DISTANCE_KM_MAP,
+            ZAMBIA_CENTER_LAT, ZAMBIA_CENTER_LON,
+            MAP_ZOOM, PROVINCE_ZOOM,
+        )
+
+        # The table stores distance_km as integers; map walk-time bands to km.
+        dist_int = DISTANCE_KM_MAP.get(
+            distance_km if distance_km is not None else 5, 5
+        )
+
+        if location.lower() == "zambia":
+            province_clause = "province IS NULL"
+            default_zoom    = MAP_ZOOM
+        else:
+            # Escape single quotes defensively
+            safe_province   = location.replace("'", "''")
+            province_clause = f"province = '{safe_province}'"
+            default_zoom    = PROVINCE_ZOOM
+
+        query = f"""
+            SELECT central_lat, central_long, current_access,
+                   total_new_facilities, geometry_wkt
+            FROM {ZAMBIA_CATALOG}.{FACILITIES_SCHEMA}.base_dashboard_data_zmb
+            WHERE country = 'Zambia'
+              AND {province_clause}
+              AND distance_km = {dist_int}
+            LIMIT 1
+        """
+        df = self.execute_query(query)
+
+        fallback = {
+            "center_lat":          ZAMBIA_CENTER_LAT,
+            "center_lon":          ZAMBIA_CENTER_LON,
+            "zoom":                default_zoom,
+            "geometry_wkt":        None,
+            "current_access":      62.24,
+            "total_new_facilities": 50,
+            "location":            location,
+        }
+        if df.empty:
+            logging.warning(
+                "base_dashboard_data_zmb returned no rows for location=%s dist=%s",
+                location, dist_int,
+            )
+            return fallback
+
+        row = df.iloc[0]
+
+        def _safe_float(val, default):
+            try:
+                return float(val) if pd.notna(val) else default
+            except (TypeError, ValueError):
+                return default
+
+        def _safe_int(val, default):
+            try:
+                return int(val) if pd.notna(val) else default
+            except (TypeError, ValueError):
+                return default
+
+        return {
+            "center_lat":          _safe_float(row.get("central_lat"),          ZAMBIA_CENTER_LAT),
+            "center_lon":          _safe_float(row.get("central_long"),          ZAMBIA_CENTER_LON),
+            "zoom":                default_zoom,
+            "geometry_wkt":        str(row["geometry_wkt"]) if pd.notna(row.get("geometry_wkt")) else None,
+            "current_access":      _safe_float(row.get("current_access"),        62.24),
+            "total_new_facilities": _safe_int(row.get("total_new_facilities"),   50),
+            "location":            location,
+        }
+
+    def get_accessibility_results_for_location(
+        self,
+        location: str = "zambia",
+        distance_km=5,
+    ) -> pd.DataFrame:
+        """
+        Fetch MCLP optimisation results for the given location and distance.
+
+        Table-name resolution:
+          Zambia country, Driving 5 km   → lgu_accessibility_results_zmb_5km
+          Zambia country, Driving 10 km  → lgu_accessibility_results_zmb_10km
+          Zambia country, Walking 30 min → lgu_accessibility_results_zmb_30min
+          Zambia country, Walking 1 hr   → lgu_accessibility_results_zmb_1hr
+
+          Province, Driving 5 km         → lgu_accessibility_results_zmb_{slug}_province_5km
+          Province, Driving 10 km        → lgu_accessibility_results_zmb_{slug}_province_10km
+          Province, Walking 30 min       → lgu_accessibility_results_zmb_{slug}_province_2km
+          Province, Walking 1 hr         → lgu_accessibility_results_zmb_{slug}_province_4km
+        """
+        from constants import PROVINCE_SLUGS
+
+        loc = (location or "zambia").strip()
+
+        if loc.lower() == "zambia":
+            # Country-level: keep explicit 30min / 1hr table names
+            suffix_map = {5: "5km", 10: "10km", "30min": "30min", "1hr": "1hr"}
+            suffix = suffix_map.get(distance_km, "5km")
+            table  = f"lgu_accessibility_results_zmb_{suffix}"
+        else:
+            # Province-level: walking maps to 2 km / 4 km equivalents
+            slug       = PROVINCE_SLUGS.get(loc, loc.lower().replace("-", "_").replace(" ", "_"))
+            suffix_map = {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"}
+            suffix     = suffix_map.get(distance_km, "5km")
+            table      = f"lgu_accessibility_results_zmb_{slug}_province_{suffix}"
+
+        logging.info("Fetching results from table: %s", table)
+
         query = f"""
             SELECT
                 total_facilities,
@@ -218,21 +340,18 @@ class QueryService:
         )
         return df.dropna(subset=["lat", "lon"]).reset_index(drop=True)
 
-    def get_user_credentials(self) -> Dict[str, str]:              # ← Dict from typing
+    def get_user_credentials(self) -> Dict[str, str]:
         query = f"""
             SELECT username, password_hash
             FROM {ZAMBIA_CATALOG}.{FACILITIES_SCHEMA}.user_credentials
         """
         df = self.execute_query(query)
         return dict(zip(df["username"], df["password_hash"]))
-    
+
     def get_gadm_boundary_wkt(self) -> Optional[str]:
         """
         Return the Zambia national boundary geometry as a WKT string.
-
-        The gadm_boundaries_zmb table contains the country-level (GADM level-0)
-        polygon(s).  We take the first row; for a single-country dashboard this
-        is always the full national boundary.
+        Kept for backward compatibility; prefer get_base_dashboard_data().
         """
         query = f"""
             SELECT geometry_wkt
