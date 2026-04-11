@@ -333,8 +333,8 @@ class QueryService:
         Table-name resolution:
           Zambia country, Driving 5 km   → lgu_accessibility_results_zmb_5km
           Zambia country, Driving 10 km  → lgu_accessibility_results_zmb_10km
-          Zambia country, Walking 30 min → lgu_accessibility_results_zmb_30min
-          Zambia country, Walking 1 hr   → lgu_accessibility_results_zmb_1hr
+          Zambia country, Walking 30 min → lgu_accessibility_results_zmb_2km
+          Zambia country, Walking 1 hr   → lgu_accessibility_results_zmb_4km
 
           Province, Driving 5 km         → lgu_accessibility_results_zmb_{slug}_province_5km
           Province, Driving 10 km        → lgu_accessibility_results_zmb_{slug}_province_10km
@@ -347,7 +347,7 @@ class QueryService:
 
         if loc.lower() == "zambia":
             # Country-level: keep explicit 30min / 1hr table names
-            suffix_map = {5: "5km", 10: "10km", "30min": "30min", "1hr": "1hr"}
+            suffix_map = {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"}
             suffix = suffix_map.get(distance_km, "5km")
             table  = f"lgu_accessibility_results_zmb_{suffix}"
         else:
