@@ -1,27 +1,3 @@
-"""
-queries.py
-Databricks SQL data-access layer for the Zambia Health Access dashboard.
-
-Two new public methods added in this revision:
-  • get_base_dashboard_data(location, distance_km)
-        → fetches center coords, boundary WKT, baseline access %, and total
-          new facilities from base_dashboard_data_zmb for any location
-          (country or province) and distance value.
-
-  • get_accessibility_results_for_location(location, distance_km)
-        → resolves the correct result table name and fetches MCLP results.
-          Handles all 44 tables (11 sessions × 4 km bands).
-
-Table-naming convention (44 tables total):
-  Country (Zambia):
-    Driving  → lgu_accessibility_results_zmb_5km / _10km
-    Walking  → lgu_accessibility_results_zmb_30min / _1hr
-
-  Province (10 × 4):
-    Driving  → lgu_accessibility_results_zmb_{slug}_province_5km / _10km
-    Walking  → lgu_accessibility_results_zmb_{slug}_province_2km / _4km
-               (2 km ≈ 30 min walk; 4 km ≈ 1 hr walk)
-"""
 
 import os
 import time
@@ -42,6 +18,11 @@ except ImportError:
     logging.basicConfig(level=logging.INFO,
                         format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     logging.warning("python-dotenv not installed — reading env vars from system only")
+
+# ── Backward-compat module-level catalog / schema constants ───────────────────
+# These are kept so that get_user_credentials / get_gadm_boundary_wkt (which
+# are Zambia-only helpers) continue to resolve the correct tables.
+# Country-aware methods resolve their own catalog / schema via _get_catalog() etc.
 
 ZAMBIA_CATALOG    = os.getenv("ZAMBIA_CATALOG",    "prd_mega")
 FACILITIES_SCHEMA = os.getenv("FACILITIES_SCHEMA", "sgpbpi163")
@@ -81,12 +62,33 @@ def credentials_provider():
     return oauth_service_principal(config)
 
 
+# ── Per-country catalog / schema helpers ──────────────────────────────────────
+
+def _get_catalog(cfg: dict) -> str:
+    """Resolve the Unity Catalog name for the given country config."""
+    return os.getenv(cfg["catalog_env"], cfg["catalog_default"])
+
+
+def _get_facilities_schema(cfg: dict) -> str:
+    """Resolve the facilities schema name for the given country config."""
+    return os.getenv(cfg["facilities_schema_env"], cfg["facilities_schema_default"])
+
+
+def _get_results_schema(cfg: dict) -> str:
+    """Resolve the results schema name for the given country config."""
+    return os.getenv(cfg["results_schema_env"], cfg["results_schema_default"])
+
+
 class QueryService:
     """
     Singleton data-access object with in-memory TTL query cache.
 
     Thread-safe: uses a lock around cache reads/writes so multiple Dash
     worker threads share a single cache without race conditions.
+
+    All public domain methods accept a `country` keyword argument (default
+    "zambia") so the same instance serves every country without separate
+    connections or caches.
     """
 
     _instance = None
@@ -169,48 +171,70 @@ class QueryService:
         self._cache_set(query, df)
         return df.copy(deep=True)
 
-    # ── Domain queries ────────────────────────────────────────────────────────
+    # ── Backward-compat wrappers (Zambia-only) ────────────────────────────────
 
     def get_existing_facilities(self) -> pd.DataFrame:
+        """Backward-compat wrapper — returns all national Zambia facilities."""
+        return self.get_existing_facilities_for_location("zambia", country="zambia")
+
+    def get_accessibility_results(self) -> pd.DataFrame:
+        """Backward-compat wrapper — fetches the default 10 km Zambia results."""
+        return self.get_accessibility_results_for_location("zambia", 10, country="zambia")
+
+    def get_accessibility_results_by_distance(self, distance_km=10) -> pd.DataFrame:
+        """Backward-compat wrapper — fetches Zambia-level results for the given distance."""
+        return self.get_accessibility_results_for_location("zambia", distance_km, country="zambia")
+
+    # ── Country-aware domain queries ──────────────────────────────────────────
+
+    def get_existing_facilities_for_location(
+        self,
+        location: str = "zambia",
+        *,
+        country: str = "zambia",
+    ) -> pd.DataFrame:
         """
-        Backward-compat wrapper — returns all national facilities.
-        Prefer get_existing_facilities_for_location() for province-scoped views.
+        Fetch existing health facilities for the given location and country.
+
+        Table resolution (driven by COUNTRY_CONFIGS templates):
+          Country-level  → cfg["country_facilities_table"]
+          Subnational    → cfg["province_facilities_template"].format(slug=slug)
+
+        The `location` value equals the country slug for country-level views
+        (e.g. "zambia" when country="zambia", "malawi" when country="malawi")
+        and equals the subnational unit display name otherwise
+        (e.g. "Central", "Northern").
+
+        QueryService caches each table result independently, so switching
+        between locations after the first load is near-instant.
         """
-        return self.get_existing_facilities_for_location("zambia")
+        from constants import get_country_config
 
-    def get_existing_facilities_for_location(self, location: str = "zambia") -> pd.DataFrame:
-        """
-        Fetch existing health facilities for the given location.
+        cfg    = get_country_config(country)
+        loc    = (location or country).strip()
+        cat    = _get_catalog(cfg)
+        schema = _get_facilities_schema(cfg)
 
-        Table resolution:
-          Zambia (country)  → health_facilities_zmb
-          Province          → health_facilities_zmb_osm_{slug}_province
-
-        Each province has its own dedicated OSM-derived facility table so that
-        the map only shows facilities relevant to the selected province — no
-        country-wide scatter bleed.
-
-        location: "zambia" for the full national table, or a province display
-                  name (e.g. "Central", "North-Western") for the province table.
-        """
-        from constants import PROVINCE_SLUGS
-
-        loc = (location or "zambia").strip()
-
-        if loc.lower() == "zambia":
-            table = "health_facilities_zmb"
+        if loc.lower() == country.lower():
+            # Country-level view
+            table = cfg["country_facilities_table"]
         else:
-            slug  = PROVINCE_SLUGS.get(
+            # Subnational view — look up the slug from the config, fall back to
+            # a normalised form of the display name if not found.
+            slug  = cfg["subnational_slugs"].get(
                 loc,
-                loc.lower().replace("-", "").replace(" ", "_"),
+                loc.lower().replace("-", "_").replace(" ", "_"),
             )
-            table = f"health_facilities_zmb_osm_{slug}_province"
+            table = cfg["province_facilities_template"].format(slug=slug)
 
-        logging.info("Fetching existing facilities from table: %s", table)
+        logging.info(
+            "Fetching existing facilities from %s.%s.%s (country=%s, location=%s)",
+            cat, schema, table, country, loc,
+        )
 
         query = f"""
             SELECT id, lat, lon, name
-            FROM {ZAMBIA_CATALOG}.{FACILITIES_SCHEMA}.{table}
+            FROM {cat}.{schema}.{table}
             ORDER BY id ASC
         """
         df = self.execute_query(query)
@@ -218,83 +242,83 @@ class QueryService:
         df["lon"]  = pd.to_numeric(df["lon"],  errors="coerce")
         df["name"] = df["name"].fillna("Health Facility")
         logging.info(
-            "Fetched %d existing facilities for location='%s' (table=%s)",
-            len(df), loc, table,
+            "Fetched %d existing facilities for country='%s' location='%s' (table=%s)",
+            len(df), country, loc, table,
         )
         return df.dropna(subset=["lat", "lon"]).reset_index(drop=True)
-
-    def get_accessibility_results(self) -> pd.DataFrame:
-        """Backward-compat wrapper — fetches the default 10 km Zambia results."""
-        return self.get_accessibility_results_for_location("zambia", 10)
-
-    def get_accessibility_results_by_distance(self, distance_km=10) -> pd.DataFrame:
-        """Backward-compat wrapper — fetches Zambia-level results for the given distance."""
-        return self.get_accessibility_results_for_location("zambia", distance_km)
-
-    # ── NEW: location-aware queries ───────────────────────────────────────────
 
     def get_base_dashboard_data(
         self,
         location: str = "zambia",
         distance_km=5,
+        *,
+        country: str = "zambia",
     ) -> dict:
         """
         Fetch map-center coordinates, boundary WKT, baseline access %, and
-        total new facilities from base_dashboard_data_zmb for the given
-        location and distance value.
+        total new facilities from the country's base_dashboard_data table.
 
-        location   : "zambia" for the whole country; province display name
-                     (e.g. "Lusaka", "Central") for a province view.
+        location   : country slug (e.g. "zambia") for the whole country, or a
+                     subnational unit display name (e.g. "Lusaka", "Northern").
         distance_km: 5 | 10 | "30min" | "1hr"
+        country    : country slug (e.g. "zambia", "malawi")
 
         Returns a plain dict with keys:
           center_lat, center_lon, zoom, geometry_wkt,
           current_access, total_new_facilities, location
         """
-        from constants import (
-            DISTANCE_KM_MAP,
-            ZAMBIA_CENTER_LAT, ZAMBIA_CENTER_LON,
-            MAP_ZOOM, PROVINCE_ZOOM,
-        )
+        from constants import get_country_config
+
+        cfg      = get_country_config(country)
+        loc      = (location or country).strip()
+        cat      = _get_catalog(cfg)
+        schema   = _get_facilities_schema(cfg)
+        table    = cfg["base_table"]
+        dist_map = cfg["distance_km_map"]
 
         # The table stores distance_km as integers; map walk-time bands to km.
-        dist_int = DISTANCE_KM_MAP.get(
-            distance_km if distance_km is not None else 5, 5
-        )
+        dist_int = dist_map.get(distance_km if distance_km is not None else 5, 5)
 
-        if location.lower() == "zambia":
+        if loc.lower() == country.lower():
             province_clause = "province IS NULL"
-            default_zoom    = MAP_ZOOM
+            default_zoom    = cfg["map_zoom"]
         else:
             # Escape single quotes defensively
-            safe_province   = location.replace("'", "''")
+            safe_province   = loc.replace("'", "''")
             province_clause = f"province = '{safe_province}'"
-            default_zoom    = PROVINCE_ZOOM
+            if country.lower() == "malawi":
+                province_clause = f"province = '{safe_province} Region'"
+            default_zoom    = cfg["province_zoom"]
+
+        db_country = cfg["db_country_name"].replace("'", "''")
 
         query = f"""
             SELECT central_lat, central_long, current_access,
                    total_new_facilities, geometry_wkt
-            FROM {ZAMBIA_CATALOG}.{FACILITIES_SCHEMA}.base_dashboard_data_zmb
-            WHERE country = 'Zambia'
+            FROM {cat}.{schema}.{table}
+            WHERE country = '{db_country}'
               AND {province_clause}
               AND distance_km = {dist_int}
             LIMIT 1
         """
         df = self.execute_query(query)
 
+        fallback_baselines = cfg["fallback_baselines"]
+        fallback_access    = fallback_baselines.get(distance_km, fallback_baselines.get(5, 0.0))
+
         fallback = {
-            "center_lat":          ZAMBIA_CENTER_LAT,
-            "center_lon":          ZAMBIA_CENTER_LON,
-            "zoom":                default_zoom,
-            "geometry_wkt":        None,
-            "current_access":      62.24,
+            "center_lat":           cfg["center_lat"],
+            "center_lon":           cfg["center_lon"],
+            "zoom":                 default_zoom,
+            "geometry_wkt":         None,
+            "current_access":       fallback_access,
             "total_new_facilities": 50,
-            "location":            location,
+            "location":             loc,
         }
         if df.empty:
             logging.warning(
-                "base_dashboard_data_zmb returned no rows for location=%s dist=%s",
-                location, dist_int,
+                "%s returned no rows for country=%s location=%s dist_int=%s",
+                table, country, loc, dist_int,
             )
             return fallback
 
@@ -313,51 +337,60 @@ class QueryService:
                 return default
 
         return {
-            "center_lat":          _safe_float(row.get("central_lat"),          ZAMBIA_CENTER_LAT),
-            "center_lon":          _safe_float(row.get("central_long"),          ZAMBIA_CENTER_LON),
-            "zoom":                default_zoom,
-            "geometry_wkt":        str(row["geometry_wkt"]) if pd.notna(row.get("geometry_wkt")) else None,
-            "current_access":      _safe_float(row.get("current_access"),        62.24),
+            "center_lat":           _safe_float(row.get("central_lat"),         cfg["center_lat"]),
+            "center_lon":           _safe_float(row.get("central_long"),         cfg["center_lon"]),
+            "zoom":                 default_zoom,
+            "geometry_wkt":         str(row["geometry_wkt"]) if pd.notna(row.get("geometry_wkt")) else None,
+            "current_access":       _safe_float(row.get("current_access"),       fallback_access),
             "total_new_facilities": _safe_int(row.get("total_new_facilities"),   50),
-            "location":            location,
+            "location":             loc,
         }
 
     def get_accessibility_results_for_location(
         self,
         location: str = "zambia",
         distance_km=5,
+        *,
+        country: str = "zambia",
     ) -> pd.DataFrame:
         """
-        Fetch MCLP optimisation results for the given location and distance.
+        Fetch MCLP optimisation results for the given location, distance, and country.
 
-        Table-name resolution:
-          Zambia country, Driving 5 km   → lgu_accessibility_results_zmb_5km
-          Zambia country, Driving 10 km  → lgu_accessibility_results_zmb_10km
-          Zambia country, Walking 30 min → lgu_accessibility_results_zmb_2km
-          Zambia country, Walking 1 hr   → lgu_accessibility_results_zmb_4km
+        Table-name resolution is driven entirely by the COUNTRY_CONFIGS templates,
+        so new countries or naming conventions only require a constants.py change.
 
-          Province, Driving 5 km         → lgu_accessibility_results_zmb_{slug}_province_5km
-          Province, Driving 10 km        → lgu_accessibility_results_zmb_{slug}_province_10km
-          Province, Walking 30 min       → lgu_accessibility_results_zmb_{slug}_province_2km
-          Province, Walking 1 hr         → lgu_accessibility_results_zmb_{slug}_province_4km
+        Example resolutions for Zambia:
+          country-level, Driving 5 km   → lgu_accessibility_results_zmb_5km
+          country-level, Walking 30 min → lgu_accessibility_results_zmb_2km
+          province, Driving 10 km       → lgu_accessibility_results_zmb_central_province_10km
+
+        Example resolutions for Malawi:
+          country-level, Driving 5 km   → lgu_accessibility_results_mwi_5km
+          region, Walking 1 hr          → lgu_accessibility_results_mwi_northern_region_4km
         """
-        from constants import PROVINCE_SLUGS
+        from constants import get_country_config
 
-        loc = (location or "zambia").strip()
+        cfg    = get_country_config(country)
+        loc    = (location or country).strip()
+        cat    = _get_catalog(cfg)
+        schema = _get_results_schema(cfg)
 
-        if loc.lower() == "zambia":
-            # Country-level: keep explicit 30min / 1hr table names
-            suffix_map = {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"}
-            suffix = suffix_map.get(distance_km, "5km")
-            table  = f"lgu_accessibility_results_zmb_{suffix}"
+        suffix_map = cfg["results_suffix_map"]
+        suffix     = suffix_map.get(distance_km, "5km")
+
+        if loc.lower() == country.lower():
+            table = cfg["country_results_template"].format(suffix=suffix)
         else:
-            # Province-level: walking maps to 2 km / 4 km equivalents
-            slug       = PROVINCE_SLUGS.get(loc, loc.lower().replace("-", "_").replace(" ", "_"))
-            suffix_map = {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"}
-            suffix     = suffix_map.get(distance_km, "5km")
-            table      = f"lgu_accessibility_results_zmb_{slug}_province_{suffix}"
+            slug  = cfg["subnational_slugs"].get(
+                loc,
+                loc.lower().replace("-", "_").replace(" ", "_"),
+            )
+            table = cfg["province_results_template"].format(slug=slug, suffix=suffix)
 
-        logging.info("Fetching results from table: %s", table)
+        logging.info(
+            "Fetching results from %s.%s.%s (country=%s, location=%s, distance=%s)",
+            cat, schema, table, country, loc, distance_km,
+        )
 
         query = f"""
             SELECT
@@ -367,7 +400,7 @@ class QueryService:
                 lon,
                 total_population_access_pct,
                 district
-            FROM {ZAMBIA_CATALOG}.{RESULTS_SCHEMA}.{table}
+            FROM {cat}.{schema}.{table}
             ORDER BY total_facilities ASC
         """
         df = self.execute_query(query)
@@ -378,6 +411,8 @@ class QueryService:
             df["total_population_access_pct"], errors="coerce"
         )
         return df.dropna(subset=["lat", "lon"]).reset_index(drop=True)
+
+    # ── Zambia-specific helpers (kept for backward compat) ────────────────────
 
     def get_user_credentials(self) -> Dict[str, str]:
         query = f"""
