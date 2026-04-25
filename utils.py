@@ -1,23 +1,3 @@
-"""
-utils.py
-Map, chart, and table helpers for the Zambia Health Access dashboard.
-
-Map approach change:
-  Folium + html.Iframe(srcDoc=...) was replaced with plotly go.Scattermap
-  rendered as a standard dcc.Graph.  Folium/Leaflet relies on external CDN JS
-  that can silently fail inside an iframe srcDoc, leaving a blank white panel.
-  go.Scattermap uses the open-street-map tile style which requires no Mapbox
-  token and renders reliably as a Plotly component inside Dash.
-
-Chart x-axis:
-  X-axis now shows actual total_facilities values from the results table
-  (e.g. 80 → 110) rather than a 0-based new-facility count.
-
-2025-07 revision:
-  build_standard_map and build_map_figure now accept dynamic center_lat,
-  center_lon, and zoom parameters so the map re-centres when the user
-  switches between the country view and a province view.
-"""
 import logging
 import pandas as pd
 import plotly.graph_objects as go
@@ -29,23 +9,27 @@ from constants import (
     MAP_ZOOM,
 )
 
-# Zambia 2025 population estimate — used for "new people reached" calculation
+# Default population constant (Zambia 2025 estimate).
+# get_recommended_table_rows() callers should pass country_population explicitly
+# for non-Zambia countries.
 ZAMBIA_POPULATION = 21_559_131
 
-_CLR_BOUNDARY      = "#F97316"               # orange line
-_CLR_BOUNDARY_FILL = "rgba(249,115,22,0.05)" # light beige/orange fill (low opacity)
+_CLR_BOUNDARY      = "#F97316"                # orange border
+_CLR_BOUNDARY_FILL = "rgba(249,115,22,0.05)"  # very light orange fill
+
 
 # ── DMS conversion ────────────────────────────────────────────────────────────
+
 def _boundary_wkt_to_coords(wkt_str: str) -> Tuple[List, List]:
     """
     Parse a WKT POLYGON / MULTIPOLYGON into parallel lat / lon lists suitable
     for a Plotly Scattermap line trace.
 
-    Pure-Python implementation — no shapely or other spatial library needed.
+    Pure-Python — no shapely or other spatial library needed.
     Ring segments are separated by None sentinels so Plotly draws each ring as
     an independent closed path with no cross-ring connecting artefacts.
 
-    Supported WKT types: POLYGON(...) and MULTIPOLYGON(...)
+    Supported: POLYGON(...) and MULTIPOLYGON(...)
     Falls back to ([], []) on any parse error.
     """
     import re
@@ -56,21 +40,17 @@ def _boundary_wkt_to_coords(wkt_str: str) -> Tuple[List, List]:
         lats: List = []
         lons: List = []
 
-        # Extract every coordinate ring — contents of each innermost (…) group
-        # that contains actual coordinate pairs (i.e. has at least one comma
-        # between two numbers).
-        ring_re   = re.compile(r"\(([^()]+)\)")
-        coord_re  = re.compile(r"(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)")
+        ring_re  = re.compile(r"\(([^()]+)\)")
+        coord_re = re.compile(r"(-?\d+(?:\.\d+)?)\s+(-?\d+(?:\.\d+)?)")
 
         for ring_match in ring_re.finditer(wkt_str):
             ring_str = ring_match.group(1)
             pairs    = coord_re.findall(ring_str)
-            if len(pairs) < 2:          # skip degenerate / empty rings
+            if len(pairs) < 2:
                 continue
             for lon_s, lat_s in pairs:
                 lons.append(float(lon_s))
                 lats.append(float(lat_s))
-            # None sentinel → Plotly lifts the pen between rings
             lons.append(None)
             lats.append(None)
 
@@ -108,21 +88,19 @@ def build_standard_map(
     """
     Build the baseline map: boundary + existing health facilities only.
     No proposed facilities.  Called on initial load, Clear Map, distance
-    switches, and location switches — any state where only ground-truth
-    data should be visible.
+    switches, and location switches.
 
     center_lat / center_lon / zoom are dynamic so the map re-centres when
-    the user switches from the whole-country view to a province view.
+    the user switches between the country view and a subnational unit view —
+    or when the country changes.
 
     Returns a fully configured go.Figure ready to hand to dcc.Graph.
     """
     fig = go.Figure()
 
-    # ── Boundary fill & border ─────────────────────────────────────────────────
     if boundary_wkt:
         b_lats, b_lons = _boundary_wkt_to_coords(boundary_wkt)
         if b_lats:
-            # Subtle fill inside the border
             fig.add_trace(go.Scattermap(
                 lat=b_lats, lon=b_lons,
                 mode="lines",
@@ -133,7 +111,6 @@ def build_standard_map(
                 showlegend=False,
                 name="boundary-fill",
             ))
-            # Visible orange border
             fig.add_trace(go.Scattermap(
                 lat=b_lats, lon=b_lons,
                 mode="lines",
@@ -143,7 +120,6 @@ def build_standard_map(
                 name="boundary-line",
             ))
 
-    # ── Existing health facilities ─────────────────────────────────────────────
     if not existing_df.empty:
         hover_text = [
             f"<b>{row.get('name', 'Health Facility')}</b><br>"
@@ -160,7 +136,6 @@ def build_standard_map(
             name="Existing Facilities",
         ))
 
-    # ── Layout ─────────────────────────────────────────────────────────────────
     layout_kwargs = dict(
         map_style="open-street-map",
         map=dict(
@@ -197,14 +172,12 @@ def build_map_figure(
     zoom: float = MAP_ZOOM,
 ) -> go.Figure:
     """
-    Build the full optimisation map: existing facilities + proposed facilities.
-    Starts from build_standard_map (boundary + existing), then layers proposed
-    facilities on top as hollow numbered circles.
+    Build the full optimisation map: existing + proposed facilities.
+    Starts from build_standard_map, then layers proposed facilities on top
+    as hollow numbered circles.
 
     Uses open-street-map tiles (no Mapbox token required).
-    Rendered as dcc.Graph — no iframe or external CDN needed.
     """
-    # ── Base: boundary + existing facilities ──────────────────────────────────
     fig = build_standard_map(
         existing_df,
         boundary_wkt=boundary_wkt,
@@ -218,71 +191,83 @@ def build_map_figure(
     # ── Proposed facilities (hollow numbered circles) ─────────────────────────
     # CRITICAL ARCHITECTURE NOTE — why exactly 3 traces, always:
     #
-    # Plotly.react() — the Dash update mechanism for dcc.Graph — works by
-    # diffing the old figure against the new one.  For Scattermap (MapLibre),
-    # if the NUMBER OF TRACES changes between renders, MapLibre receives a
-    # structural change it cannot process via react() and silently keeps the
-    # old layers.  The frontend appears frozen even though the callback ran.
+    # go.Scattermap does not support per-marker text styling, so numbering
+    # proposed facilities requires a dedicated "text" trace on top of the
+    # marker trace.  A third invisible trace carries the hover tooltip because
+    # the text trace's hover is unreliable when markers are absent.
     #
-    # Fix: exactly 3 proposed-facility traces regardless of N:
-    #   Layer A — one marker trace,  all N green outer rings
-    #   Layer B — one marker trace,  all N white inner fills  (hollow effect)
-    #   Layer C — ONE text trace,    all N number labels
-    #
-    # Total trace count with boundary = 6, without boundary = 4 — always fixed.
+    # Always emit all 3 traces even when new_df is empty — this keeps the
+    # trace count stable across updates and prevents Plotly from animating
+    # a removal / re-addition transition.
 
-    hover_texts = [
-        f"<b>Proposed Facility #{i + 1}</b><br>"
-        f"ID: {row.get('new_facility', 'N/A')}<br>"
-        f"{row['lat']:.4f}° N, {row['lon']:.4f}° E"
-        for i, (_, row) in enumerate(new_df.iterrows())
+    new_lats = new_df["lat"].tolist() if not new_df.empty else []
+    new_lons = new_df["lon"].tolist() if not new_df.empty else []
+    numbers  = [str(i + 1) for i in range(len(new_df))]
+    hover_tx = [
+        f"<b>Proposed #{i + 1}</b><br>{r['lat']:.4f}° N, {r['lon']:.4f}° E"
+        for i, (_, r) in enumerate(new_df.iterrows())
     ] if not new_df.empty else []
 
-    lats   = new_df["lat"].tolist() if not new_df.empty else []
-    lons   = new_df["lon"].tolist() if not new_df.empty else []
-    labels = [str(i + 1) for i in range(len(new_df))]
-
+    # Hollow marker ring
+    # fig.add_trace(go.Scattermap(
+    #     lat=new_lats, lon=new_lons,
+    #     mode="markers",
+    #     marker=dict(size=18, color="#FFFFFF", opacity=1.0),
+    #     hoverinfo="skip",
+    #     showlegend=False,
+    #     name="new-ring",
+    # ))
+    
     # Layer A — green outer ring
     fig.add_trace(go.Scattermap(
-        lat=lats, lon=lons,
+        lat=new_lats, lon=new_lons,
         mode="markers",
         marker=dict(size=26, color="#16A34A", opacity=1.0),
-        hovertext=hover_texts,
-        hoverinfo="text" if lats else "skip",
+        hovertext=hover_tx,
+        hoverinfo="text" if new_lats else "skip",
         name="Proposed Facilities",
         showlegend=False,
     ))
 
     # Layer B — white inner fill (creates the hollow look)
     fig.add_trace(go.Scattermap(
-        lat=lats, lon=lons,
+        lat=new_lats, lon=new_lons,
         mode="markers",
         marker=dict(size=17, color="#FFFFFF", opacity=1.0),
         hoverinfo="skip",
         showlegend=False,
     ))
-
-    # Layer C — ONE text trace with all N number labels (fixed trace count)
+    # Number label
     fig.add_trace(go.Scattermap(
-        lat=lats, lon=lons,
+        lat=new_lats, lon=new_lons,
         mode="text",
-        text=labels,
-        textfont=dict(color="#16A34A", size=11, family="Inter, sans-serif"),
-        textposition="middle center",
+        text=numbers,
+        textfont=dict(size=10, color="#0EA5E9", family="Inter, sans-serif"),
         hoverinfo="skip",
         showlegend=False,
+        name="new-labels",
+    ))
+    # Invisible hover target
+    fig.add_trace(go.Scattermap(
+        lat=new_lats, lon=new_lons,
+        mode="markers",
+        marker=dict(size=18, color="rgba(0,0,0,0)", opacity=0),
+        text=hover_tx,
+        hoverinfo="text",
+        showlegend=False,
+        name="new-hover",
     ))
 
     return fig
 
 
-# ── Accessibility helpers ─────────────────────────────────────────────────────
+# ── Accessibility computation helpers ─────────────────────────────────────────
 
-def get_new_facility_rows(results_df: pd.DataFrame, n: int) -> pd.DataFrame:
-    """Return the first n rows from the optimisation results table."""
-    if n == 0 or results_df.empty:
+def get_new_facility_rows(results_df: pd.DataFrame, n_new: int) -> pd.DataFrame:
+    """Return the first n_new rows from the results table (new facility candidates)."""
+    if n_new == 0 or results_df.empty:
         return pd.DataFrame(columns=results_df.columns)
-    return results_df.head(n).copy()
+    return results_df.head(n_new).reset_index(drop=True)
 
 
 def get_true_baseline(results_df: pd.DataFrame, n_existing: int,
@@ -292,10 +277,7 @@ def get_true_baseline(results_df: pd.DataFrame, n_existing: int,
 
     Looks for the row where total_facilities == n_existing (i.e. zero new
     facilities added).  Falls back to the first row value, then to the
-    hardcoded fallback constant.  This must be used instead of the externally-
-    supplied baseline_pct wherever the chart or KPI cards need the baseline,
-    because the external value can be scoped to the wrong location (e.g. the
-    national figure while a province is selected).
+    hardcoded fallback constant.
     """
     if results_df.empty:
         return fallback_pct
@@ -360,26 +342,12 @@ def build_accessibility_chart(
     X-axis uses actual total_facilities column values (e.g. 163 → 222),
     starting from n_existing (baseline) rather than 0.
     The highlighted dot marks the currently selected slider position.
-
-    Baseline anchor fix: the first chart point always uses the true DB baseline
-    — the total_population_access_pct at total_facilities == n_existing (i.e.
-    zero new facilities added).  We no longer inject the externally-supplied
-    baseline_pct as a synthetic first point, because that value can come from
-    the wrong scope (e.g. national fallback while a province is selected) and
-    produces an abrupt near-vertical spike at the left edge of the chart.
-
-    The externally-supplied baseline_pct is kept only as a last-resort fallback
-    when the results table is empty.
     """
     if results_df.empty:
-        # Nothing to plot — return a flat baseline line
         x_vals = [n_existing]
         y_vals = [baseline_pct]
         true_baseline = baseline_pct
     else:
-        # Derive the true baseline directly from the results table:
-        # the row where total_facilities equals n_existing represents the
-        # accessibility BEFORE any new facility is added for this province/scope.
         baseline_row = results_df.loc[
             results_df["total_facilities"] == n_existing,
             "total_population_access_pct",
@@ -387,13 +355,11 @@ def build_accessibility_chart(
         if not baseline_row.empty:
             true_baseline = float(baseline_row.iloc[0])
         else:
-            # Fallback: use the first row's value (smallest total_facilities)
             true_baseline = float(results_df["total_population_access_pct"].iloc[0])
 
         x_vals = list(results_df["total_facilities"])
         y_vals = list(results_df["total_population_access_pct"])
 
-        # Prepend baseline anchor only if n_existing is not already the first x
         if x_vals[0] != n_existing:
             x_vals = [n_existing] + x_vals
             y_vals = [true_baseline] + y_vals
@@ -410,7 +376,6 @@ def build_accessibility_chart(
 
     fig = go.Figure()
 
-    # Shaded fill under the curve
     fig.add_trace(go.Scatter(
         x=x_vals,
         y=y_vals,
@@ -422,7 +387,6 @@ def build_accessibility_chart(
         name="Accessibility",
     ))
 
-    # Current selection dot
     fig.add_trace(go.Scatter(
         x=[current_x],
         y=[current_y],
@@ -481,17 +445,24 @@ def get_recommended_table_rows(
     results_df: pd.DataFrame,
     n_new: int,
     baseline_pct: float = BASELINE_ACCESS_PCT,
+    country_population: int = ZAMBIA_POPULATION,
 ) -> List[Dict]:
     """
     Return a list of row dicts for the Recommended Locations table.
-    Keys: no, lon_dms, lat_dms, new_people
+
+    Keys: no, lon_dms, lat_dms, district, new_people
+
+    country_population: total national population used to convert an
+        accessibility-percentage delta to an estimated number of newly-reached
+        people.  Pass cfg["population"] from get_country_config() for
+        non-Zambia countries.  Defaults to ZAMBIA_POPULATION for backward
+        compatibility.
     """
     if n_new == 0 or results_df.empty:
         return []
 
     rows = results_df.head(n_new).reset_index(drop=True)
 
-    # Per-facility accessibility delta → estimate new people reached
     access_vals = [baseline_pct] + list(rows["total_population_access_pct"])
     deltas      = [access_vals[i + 1] - access_vals[i] for i in range(len(rows))]
 
@@ -502,6 +473,6 @@ def get_recommended_table_rows(
             "lon_dms":    _to_dms(float(row["lon"]), is_lat=False),
             "lat_dms":    _to_dms(float(row["lat"]), is_lat=True),
             "district":   row.get("district") or "—",
-            "new_people": max(0, int(deltas[i] / 100 * ZAMBIA_POPULATION)),
+            "new_people": max(0, int(deltas[i] / 100 * country_population)),
         })
     return result

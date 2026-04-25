@@ -1,27 +1,7 @@
-"""
-app.py
-Zambia Health Access – Facility Placement Optimisation Dashboard
 
-2025-07 revision
-  • Location dropdown added to the header (left of legend pills).
-    Supports Zambia country-level and all 10 provinces.
-  • Map centre, zoom, boundary WKT, and baseline access % are all fetched
-    dynamically from base_dashboard_data_zmb so every location switch
-    produces a correctly centred, correctly scaled, correctly scoped view.
-  • Travel mode drives the Measure (Distance / Time) and Value dropdowns:
-      Driving  → Distance → 5 km / 10 km
-      Walking  → Time     → 30 min / 1 hr
-  • All 44 result tables (11 sessions × 4 km bands) are resolved by
-    get_accessibility_results_for_location() in queries.py.
-
-Map: Plotly go.Scattermap with open-street-map tiles (no token, no iframe).
-Font: Inter throughout the UI; Space Mono only for coordinate values.
-
-Run:
-    pip install dash dash-bootstrap-components pandas flask plotly
-    python app.py
-"""
 import logging
+from urllib.parse import parse_qs
+
 import pandas as pd
 import plotly.graph_objects as go
 from typing import Dict, List, Optional
@@ -40,6 +20,11 @@ from utils import (
     get_recommended_table_rows,
 )
 from constants import (
+    # Country registry helpers
+    get_country_config,
+    DEFAULT_COUNTRY,
+    VALID_COUNTRIES,
+    # Zambia backward-compat (used as defaults in utils.py function signatures)
     BASELINE_ACCESS_PCT,
     BASELINE_ACCESS_PCT_5KM,
     BASELINE_ACCESS_PCT_10KM,
@@ -49,8 +34,6 @@ from constants import (
     ZAMBIA_CENTER_LAT,
     ZAMBIA_CENTER_LON,
     MAP_ZOOM,
-    PROVINCES,
-    PROVINCE_SLUGS,
 )
 
 # ── Dash app ──────────────────────────────────────────────────────────────────
@@ -67,54 +50,50 @@ app = Dash(
 
 db = QueryService.get_instance()
 
+# ── Startup: pre-warm the Zambia query cache ───────────────────────────────────
+# Keyed by country slug so multiple countries can be cached independently.
+# Only Zambia is pre-loaded at startup (most common default).
+# For any other country the first user page-load triggers the DB fetch; after
+# that, subsequent loads hit the QueryService TTL cache.
+
+_BOUNDARY_WKT_CACHE: dict = {}
+
+try:
+    _init_base = db.get_base_dashboard_data("zambia", 5, country="zambia")
+    _BOUNDARY_WKT_CACHE["zambia"] = _init_base.get("geometry_wkt")
+    logging.info(
+        "Startup boundary WKT pre-loaded for Zambia (len=%d)",
+        len(_BOUNDARY_WKT_CACHE.get("zambia") or ""),
+    )
+except Exception as _e:
+    logging.warning("Startup base-data load failed: %s", _e)
+
+
 # ── Baseline helper ────────────────────────────────────────────────────────────
 
-def _get_baseline(distance_km, base_data: Optional[dict] = None) -> float:
+def _get_baseline(
+    distance_km,
+    base_data: Optional[dict] = None,
+    country: str = DEFAULT_COUNTRY,
+) -> float:
     """
     Return the correct baseline access %.
-    Prefers the live value from base_dashboard_data_zmb (via store-base-data).
-    Falls back to hardcoded constants when the store is not yet populated or
-    the query failed.
+
+    Priority:
+      1. Live value from store-base-data (fetched from Databricks).
+      2. Hardcoded fallback from COUNTRY_CONFIGS[country]["fallback_baselines"].
+
+    The country argument is needed for step 2 so non-Zambia countries return
+    their own fallback rather than Zambia's.
     """
     if base_data and base_data.get("current_access") is not None:
         try:
             return float(base_data["current_access"])
         except (ValueError, TypeError):
             pass
-    # Hardcoded fallback
-    if distance_km == "30min":
-        return BASELINE_ACCESS_PCT_30MIN
-    if distance_km == "1hr":
-        return BASELINE_ACCESS_PCT_1HR
-    if distance_km == 5 or distance_km == "5":
-        return BASELINE_ACCESS_PCT_5KM
-    return BASELINE_ACCESS_PCT_10KM
+    cfg = get_country_config(country)
+    return cfg["fallback_baselines"].get(distance_km, cfg["fallback_baselines"].get(5, 0.0))
 
-
-# ── Startup: pre-load Zambia country boundary for the first render ─────────────
-# store-base-data is populated by a callback after the first render cycle.
-# _BOUNDARY_WKT serves as a synchronous fallback so the very first map render
-# is not blank.
-
-_BOUNDARY_WKT: Optional[str] = None
-try:
-    _init_base = db.get_base_dashboard_data("zambia", 5)
-    _BOUNDARY_WKT = _init_base.get("geometry_wkt")
-    logging.info("Startup base data loaded (boundary_wkt len=%d)", len(_BOUNDARY_WKT or ""))
-except Exception as _e:
-    logging.warning("Startup base data load failed: %s", _e)
-
-# ── Location dropdown options ─────────────────────────────────────────────────
-# Zambia is the country-level entry; provinces appear as an indented sub-list.
-# The separator is disabled so it cannot be selected.
-
-LOCATION_DROPDOWN_OPTIONS = [
-    {"label": "Zambia", "value": "zambia"},
-    {"label": "── Provinces ──", "value": "_sep", "disabled": True},
-] + [
-    {"label": f"      {p}", "value": p}
-    for p in PROVINCES
-]
 
 # ── Design tokens ─────────────────────────────────────────────────────────────
 
@@ -196,13 +175,13 @@ LEGEND_DOT_BASE = {
 }
 
 LEGEND_PIN_BASE = {
-    "display":         "inline-block",
-    "width":           "12px",
-    "height":          "12px",
-    "borderRadius":    "50% 50% 50% 0",
-    "transform":       "rotate(-45deg)",
-    "flexShrink":      "0",
-    "marginBottom":    "4px",
+    "display":      "inline-block",
+    "width":        "12px",
+    "height":       "12px",
+    "borderRadius": "50% 50% 50% 0",
+    "transform":    "rotate(-45deg)",
+    "flexShrink":   "0",
+    "marginBottom": "4px",
 }
 
 def legend_pin(color: str) -> html.Span:
@@ -289,8 +268,6 @@ SLIDER_LABEL_STYLE = {
     "marginBottom": "8px",
 }
 
-# ── +/- stepper control ───────────────────────────────────────────────────────
-
 STEPPER_WRAP_STYLE = {
     "display": "flex",
     "alignItems": "stretch",
@@ -360,15 +337,15 @@ VIEW_BTN_STYLE = {
 
 VIEW_BTN_STYLE_DISABLED = {
     **VIEW_BTN_STYLE,
-    "background":  TEXT_LO,
-    "cursor":      "not-allowed",
-    "opacity":     "0.55",
+    "background": TEXT_LO,
+    "cursor":     "not-allowed",
+    "opacity":    "0.55",
 }
 
 CLEAR_BTN_STYLE = {
     **VIEW_BTN_STYLE,
-    "background":  "#DC2626",
-    "cursor":      "pointer",
+    "background": "#DC2626",
+    "cursor":     "pointer",
 }
 
 STAT_PAIR_STYLE = {
@@ -442,7 +419,7 @@ def legend_dot(color: str, border_color: Optional[str] = None) -> html.Span:
 
 
 def filter_chip(label: str, value: str) -> html.Div:
-    """Static non-interactive filter chip matching the Figma dropdown style."""
+    """Static non-interactive filter chip."""
     return html.Div(
         style={"display": "flex", "flexDirection": "column"},
         children=[
@@ -453,8 +430,7 @@ def filter_chip(label: str, value: str) -> html.Div:
                     html.Span(value, style={"flex": "1"}),
                     html.Span(
                         "▾",
-                        style={"color": TEXT_LO, "fontSize": "0.72rem",
-                               "flexShrink": "0"},
+                        style={"color": TEXT_LO, "fontSize": "0.72rem", "flexShrink": "0"},
                     ),
                 ],
             ),
@@ -462,7 +438,8 @@ def filter_chip(label: str, value: str) -> html.Div:
     )
 
 
-def filter_dropdown(label: str, options: list, value, dropdown_id: str, disabled: bool = False) -> html.Div:
+def filter_dropdown(label: str, options: list, value, dropdown_id: str,
+                    disabled: bool = False) -> html.Div:
     """Interactive filter dropdown styled to match the existing filter chips."""
     return html.Div(
         style={"display": "flex", "flexDirection": "column"},
@@ -560,25 +537,36 @@ app.layout = html.Div(
     style=PAGE_STYLE,
     children=[
 
+        # ── URL location component (reads ?country= query param) ──────────────
+        # refresh=False: URL changes do not cause a full page reload.
+        # Posit Connect iframe embedding preserves query-string parameters, so
+        # dcc.Location.search will contain e.g. "?country=malawi" on load.
+        dcc.Location(id="url", refresh=False),
+
         # ── Data stores ───────────────────────────────────────────────────────
+        # store-country: set once from the URL query param; drives everything else.
+        dcc.Store(id="store-country",  data=DEFAULT_COUNTRY),
         dcc.Store(id="store-existing-facilities"),
         dcc.Store(id="store-accessibility-results"),
         dcc.Store(id="store-n-new",       data=0),
         dcc.Store(id="store-distance-km", data=5),
         dcc.Store(id="store-map-active",  data=False),
-        # NEW stores ──────────────────────────────────────────────────────────
-        dcc.Store(id="store-location",    data="zambia"),   # selected location
-        dcc.Store(id="store-base-data",   data=None),       # base dashboard data
+        # store-location: country slug for country-level view, sub-unit name
+        # (e.g. "Central") for sub-national view.  Initialised to None;
+        # immediately populated by callback once store-country is set.
+        dcc.Store(id="store-location",    data=None),
+        dcc.Store(id="store-base-data",   data=None),
 
         # ── Header ────────────────────────────────────────────────────────────
         html.Div(
             style=HEADER_STYLE,
             children=[
 
-                # Left: brand
+                # Left: brand (title updated dynamically by callback)
                 html.Div([
                     html.Div(
-                        "Zambia Health Access",
+                        id="header-title",
+                        children="Health Access Dashboard",
                         style={
                             "fontFamily": FONT_BODY,
                             "fontSize": "1.2rem",
@@ -604,12 +592,15 @@ app.layout = html.Div(
                     style={"display": "flex", "gap": "10px", "alignItems": "center"},
                     children=[
 
-                        # ── Location dropdown (hierarchical: Zambia + 10 provinces) ──
+                        # ── Location dropdown ─────────────────────────────────
+                        # Options and value are populated dynamically by the
+                        # update_location_dropdown callback whenever store-country
+                        # changes.  Initialised empty to avoid a flash of stale
+                        # Zambia options when loading the Malawi URL.
                         html.Div(
                             style={"display": "flex", "flexDirection": "column"},
                             children=[
                                 html.Span(
-                                    # "Location",
                                     style={
                                         **FILTER_FIELD_LABEL,
                                         "marginBottom": "3px",
@@ -618,11 +609,11 @@ app.layout = html.Div(
                                 ),
                                 dcc.Dropdown(
                                     id="dropdown-location",
-                                    options=LOCATION_DROPDOWN_OPTIONS,
-                                    value="zambia",
+                                    options=[],      # populated by callback
+                                    value=None,      # populated by callback
                                     clearable=False,
                                     searchable=False,
-                                    placeholder="Choose location",
+                                    placeholder="Loading…",
                                     optionHeight=32,
                                     style={
                                         "minWidth": "195px",
@@ -658,7 +649,7 @@ app.layout = html.Div(
                                 "verticalAlign": "middle",
                                 "marginBottom": "1px",
                             }),
-                            html.Span(id="legend-boundary-label", children="Zambia boundary"),
+                            html.Span(id="legend-boundary-label", children="—"),
                         ]),
                     ],
                 ),
@@ -674,7 +665,7 @@ app.layout = html.Div(
             },
             children=[
 
-                # ── LEFT: Map ────────────────────────────────────────────────
+                # ── LEFT: Map ─────────────────────────────────────────────────
                 html.Div(
                     style={
                         "flex": "0 0 50%",
@@ -712,7 +703,6 @@ app.layout = html.Div(
                                     value="Driving",
                                     dropdown_id="dropdown-travel-mode",
                                 ),
-                                # Measure: read-only, auto-set by travel mode callback
                                 filter_dropdown(
                                     "Measure",
                                     options=[
@@ -723,7 +713,6 @@ app.layout = html.Div(
                                     dropdown_id="dropdown-measure",
                                     disabled=True,
                                 ),
-                                # Value: 5 km / 10 km (Driving) or 30 min / 1 hr (Walking)
                                 filter_dropdown(
                                     "Value",
                                     options=[
@@ -761,7 +750,8 @@ app.layout = html.Div(
                                                     html.Div(
                                                         [
                                                             "Number of health facilities in ",
-                                                            html.Span(id="ca-location-label", children="Zambia"),
+                                                            html.Span(id="ca-location-label",
+                                                                      children="—"),
                                                         ],
                                                         style=BIG_NUM_LABEL_STYLE,
                                                     ),
@@ -779,13 +769,16 @@ app.layout = html.Div(
                                                             "Percentage of population with access to ",
                                                             html.I("all"),
                                                             " health facilities in ",
-                                                            html.Span(id="location-label-detail", children="Zambia"),
+                                                            html.Span(id="location-label-detail",
+                                                                      children="—"),
                                                             " within ",
-                                                            html.U(id="distance-value-label", children="5 km"),
+                                                            html.U(id="distance-value-label",
+                                                                   children="5 km"),
                                                             " travel ",
                                                             html.Span(
                                                                 id="travel-mode-description",
-                                                                children=[html.I("distance"), " by driving"],
+                                                                children=[html.I("distance"),
+                                                                          " by driving"],
                                                             ),
                                                         ],
                                                         style=BIG_NUM_LABEL_STYLE,
@@ -815,7 +808,6 @@ app.layout = html.Div(
                                                     style={"flex": "0 0 200px"},
                                                     children=[
 
-                                                        # STATS ROW
                                                         html.Div(
                                                             style={
                                                                 "display": "flex",
@@ -824,36 +816,44 @@ app.layout = html.Div(
                                                                 "marginBottom": "16px",
                                                             },
                                                             children=[
-                                                                html.Div(
-                                                                    children=[
-                                                                        html.Div(
-                                                                            id="om-n-new",
-                                                                            style={**BIG_NUM_STYLE, "fontSize": "1.65rem"},
-                                                                        ),
-                                                                        html.Div(
-                                                                            "New facilities added",
-                                                                            style=BIG_NUM_LABEL_STYLE,
-                                                                        ),
-                                                                    ],
-                                                                ),
+                                                                html.Div([
+                                                                    html.Div(
+                                                                        id="om-n-new",
+                                                                        style={**BIG_NUM_STYLE, "fontSize": "1.65rem"},
+                                                                    ),
+                                                                    html.Div(
+                                                                        "New facilities added",
+                                                                        style=BIG_NUM_LABEL_STYLE,
+                                                                    ),
+                                                                ]),
                                                             ],
                                                         ),
 
-                                                        # Field 1: Number of new facilities
                                                         html.Div(
                                                             style={"marginBottom": "12px"},
                                                             children=[
-                                                                html.Div("Number of new facilities", style=SLIDER_LABEL_STYLE),
+                                                                html.Div("Number of new facilities",
+                                                                         style=SLIDER_LABEL_STYLE),
                                                                 html.Div(
                                                                     style=STEPPER_WRAP_STYLE,
                                                                     children=[
-                                                                        html.Div(id="stepper-display", style=STEPPER_VALUE_STYLE, children="0"),
+                                                                        html.Div(id="stepper-display",
+                                                                                 style=STEPPER_VALUE_STYLE,
+                                                                                 children="0"),
                                                                         html.Div(
                                                                             style=STEPPER_BTN_GROUP_STYLE,
                                                                             children=[
-                                                                                html.Button("+", id="btn-increase", n_clicks=0, style=STEPPER_BTN_STYLE),
-                                                                                html.Div(style={"height": "1px", "background": BORDER, "flexShrink": "0"}),
-                                                                                html.Button("−", id="btn-decrease", n_clicks=0, style=STEPPER_BTN_STYLE),
+                                                                                html.Button("+", id="btn-increase",
+                                                                                            n_clicks=0,
+                                                                                            style=STEPPER_BTN_STYLE),
+                                                                                html.Div(style={
+                                                                                    "height": "1px",
+                                                                                    "background": BORDER,
+                                                                                    "flexShrink": "0",
+                                                                                }),
+                                                                                html.Button("−", id="btn-decrease",
+                                                                                            n_clicks=0,
+                                                                                            style=STEPPER_BTN_STYLE),
                                                                             ],
                                                                         ),
                                                                     ],
@@ -861,25 +861,35 @@ app.layout = html.Div(
                                                             ],
                                                         ),
 
-                                                        # Field 2: Optimized Accessibility %
                                                         html.Div(
                                                             style={"marginBottom": "0"},
                                                             children=[
-                                                                html.Div("Optimized Accessibility %", style=SLIDER_LABEL_STYLE),
+                                                                html.Div("Optimized Accessibility %",
+                                                                         style=SLIDER_LABEL_STYLE),
                                                                 html.Div(
                                                                     style=STEPPER_WRAP_STYLE,
                                                                     children=[
                                                                         html.Div(
                                                                             id="stepper-access-display",
-                                                                            style={**STEPPER_VALUE_STYLE, "color": ACC_INDIGO, "fontWeight": "600"},
-                                                                            children="62.24%",
+                                                                            style={**STEPPER_VALUE_STYLE,
+                                                                                   "color": ACC_INDIGO,
+                                                                                   "fontWeight": "600"},
+                                                                            children="—",
                                                                         ),
                                                                         html.Div(
                                                                             style=STEPPER_BTN_GROUP_STYLE,
                                                                             children=[
-                                                                                html.Button("+", id="btn-increase-2", n_clicks=0, style=STEPPER_BTN_STYLE),
-                                                                                html.Div(style={"height": "1px", "background": BORDER, "flexShrink": "0"}),
-                                                                                html.Button("−", id="btn-decrease-2", n_clicks=0, style=STEPPER_BTN_STYLE),
+                                                                                html.Button("+", id="btn-increase-2",
+                                                                                            n_clicks=0,
+                                                                                            style=STEPPER_BTN_STYLE),
+                                                                                html.Div(style={
+                                                                                    "height": "1px",
+                                                                                    "background": BORDER,
+                                                                                    "flexShrink": "0",
+                                                                                }),
+                                                                                html.Button("−", id="btn-decrease-2",
+                                                                                            n_clicks=0,
+                                                                                            style=STEPPER_BTN_STYLE),
                                                                             ],
                                                                         ),
                                                                     ],
@@ -887,7 +897,6 @@ app.layout = html.Div(
                                                             ],
                                                         ),
 
-                                                        # View locations button
                                                         html.Button(
                                                             "View locations",
                                                             id="btn-view-locations",
@@ -908,22 +917,18 @@ app.layout = html.Div(
                                                         "gap": "8px",
                                                     },
                                                     children=[
-
-                                                        # Accessibility % stat
-                                                        html.Div(
-                                                            children=[
-                                                                html.Div(
-                                                                    id="om-access-pct",
-                                                                    style={**BIG_NUM_STYLE, "fontSize": "1.65rem", "color": ACC_INDIGO},
-                                                                ),
-                                                                html.Div(
-                                                                    id="om-delta-label",
-                                                                    style=BIG_NUM_LABEL_STYLE,
-                                                                ),
-                                                            ],
-                                                        ),
-
-                                                        # Chart
+                                                        html.Div([
+                                                            html.Div(
+                                                                id="om-access-pct",
+                                                                style={**BIG_NUM_STYLE,
+                                                                       "fontSize": "1.65rem",
+                                                                       "color": ACC_INDIGO},
+                                                            ),
+                                                            html.Div(
+                                                                id="om-delta-label",
+                                                                style=BIG_NUM_LABEL_STYLE,
+                                                            ),
+                                                        ]),
                                                         dcc.Graph(
                                                             id="accessibility-chart",
                                                             figure=_empty_figure(),
@@ -946,11 +951,8 @@ app.layout = html.Div(
                                     ],
                                 ),
 
-                                # Footer
-                                html.Div(
-                                    "World Bank · Public Infrastructure Investment · GoAT · Zambia 2025",
-                                    style=FOOTER_STYLE,
-                                ),
+                                # Footer (updated dynamically by callback)
+                                html.Div(id="footer-text", style=FOOTER_STYLE),
                             ],
                         ),
                     ],
@@ -968,8 +970,8 @@ def _make_graph(figure: go.Figure, key: str) -> html.Div:
     Wrap a Plotly figure in a div with a unique `key` to force React remount.
 
     React uses `key` to decide whether a component is the same element or a
-    new one.  When `key` changes, React unmounts the old div and mounts
-    a brand-new one — guaranteeing that Plotly initialises fresh instead of
+    new one.  When `key` changes, React unmounts the old div and mounts a
+    brand-new one — guaranteeing that Plotly initialises fresh instead of
     trying to diff/patch the existing MapLibre instance.
     """
     return html.Div(
@@ -985,106 +987,204 @@ def _make_graph(figure: go.Figure, key: str) -> html.Div:
 
 # ── Callbacks ─────────────────────────────────────────────────────────────────
 
-# ── 1. Sync location store from dropdown ──────────────────────────────────────
+# ── 0. Parse country from URL query string ────────────────────────────────────
+
+@app.callback(
+    Output("store-country", "data"),
+    Input("url", "search"),
+    prevent_initial_call=False,   # must fire on first render to read the URL
+)
+def parse_country_from_url(search: str) -> str:
+    """
+    Read the ?country=<slug> query parameter and write it to store-country.
+
+    Fires immediately on page load so the rest of the callback graph uses the
+    correct country before any data is fetched.
+
+    Invalid slugs are silently replaced with DEFAULT_COUNTRY ("zambia") so
+    misconfigured embed links degrade gracefully rather than crashing.
+    """
+    if not search:
+        return DEFAULT_COUNTRY
+
+    try:
+        params      = parse_qs(search.lstrip("?"))
+        country_raw = params.get("country", [DEFAULT_COUNTRY])[0].lower().strip()
+    except Exception:
+        return DEFAULT_COUNTRY
+
+    if country_raw in VALID_COUNTRIES:
+        logging.info("URL param country=%s accepted", country_raw)
+        return country_raw
+
+    logging.warning(
+        "Unknown ?country=%s; defaulting to '%s'. "
+        "Valid values: %s",
+        country_raw, DEFAULT_COUNTRY, sorted(VALID_COUNTRIES),
+    )
+    return DEFAULT_COUNTRY
+
+
+# ── 1. Populate location dropdown from active country ─────────────────────────
+
+@app.callback(
+    Output("dropdown-location", "options"),
+    Output("dropdown-location", "value"),
+    Input("store-country", "data"),
+)
+def update_location_dropdown(country: str):
+    """
+    Rebuild the location dropdown whenever the active country changes.
+
+    The top entry is the country itself (country-level view).
+    Below it is a disabled separator followed by the subnational units
+    (provinces, regions, …) defined in COUNTRY_CONFIGS.
+    """
+    country      = country or DEFAULT_COUNTRY
+    cfg          = get_country_config(country)
+    display_name = cfg["display_name"]
+    sub_label    = cfg["subnational_label"]
+    units        = cfg["subnational_units"]
+
+    options = [
+        {"label": display_name, "value": country},
+        {"label": f"── {sub_label}s ──", "value": "_sep", "disabled": True},
+    ] + [
+        {"label": f"      {u}", "value": u}
+        for u in units
+    ]
+
+    # Reset to country-level view whenever country changes
+    return options, country
+
+
+# ── 2. Sync store-location from dropdown or country change ────────────────────
 
 @app.callback(
     Output("store-location", "data"),
     Input("dropdown-location", "value"),
+    Input("store-country",     "data"),
 )
-def update_location_store(value):
-    """Persist the selected location (country or province) into the store."""
-    return value if value and value != "_sep" else "zambia"
+def update_location_store(dropdown_val: str, country: str) -> str:
+    """
+    Write the selected location to store-location.
+
+    When the trigger is store-country (country changed), the location resets
+    to the country-level view (country slug).  When the trigger is
+    dropdown-location, the chosen value is used (filtered against the sentinel
+    "_sep" which is the disabled separator row).
+    """
+    country  = country or DEFAULT_COUNTRY
+    triggered = ctx.triggered_id
+
+    if triggered == "store-country":
+        # Country just changed — reset location to country level
+        return country
+
+    # Dropdown interaction
+    if not dropdown_val or dropdown_val == "_sep":
+        return country
+
+    return dropdown_val
 
 
-# ── 2. Fetch base dashboard data (center, boundary, baseline) ─────────────────
+# ── 3. Fetch base dashboard data (center, boundary, baseline) ─────────────────
 
 @app.callback(
     Output("store-base-data", "data"),
     Input("store-location",    "data"),
     Input("store-distance-km", "data"),
+    State("store-country",     "data"),
 )
-def fetch_base_data(location, distance_km):
+def fetch_base_data(location, distance_km, country):
     """
     Re-fetch base dashboard data whenever location or distance changes.
-    This drives map centre, zoom, boundary WKT, and baseline access %.
+    Drives: map centre, zoom, boundary WKT, and baseline access %.
     """
-    loc = location or "zambia"
-    km  = distance_km if distance_km is not None else 5
+    country = country or DEFAULT_COUNTRY
+    loc     = location or country
+    km      = distance_km if distance_km is not None else 5
+
     try:
-        data = db.get_base_dashboard_data(loc, km)
+        data = db.get_base_dashboard_data(loc, km, country=country)
         logging.info(
-            "Base data fetched: location=%s km=%s access=%.2f%%",
-            loc, km, data.get("current_access", 0),
+            "Base data fetched: country=%s location=%s km=%s access=%.2f%%",
+            country, loc, km, data.get("current_access", 0),
         )
         return data
     except Exception as exc:
-        logging.error("fetch_base_data error: %s", exc)
-        from constants import PROVINCE_ZOOM, MAP_ZOOM
+        logging.error("fetch_base_data error (country=%s loc=%s): %s", country, loc, exc)
+        cfg = get_country_config(country)
         return {
-            "center_lat":          ZAMBIA_CENTER_LAT,
-            "center_lon":          ZAMBIA_CENTER_LON,
-            "zoom":                MAP_ZOOM if loc == "zambia" else PROVINCE_ZOOM,
-            "geometry_wkt":        _BOUNDARY_WKT,
-            "current_access":      _get_baseline(km),
+            "center_lat":           cfg["center_lat"],
+            "center_lon":           cfg["center_lon"],
+            "zoom":                 cfg["map_zoom"] if loc.lower() == country.lower()
+                                    else cfg["province_zoom"],
+            "geometry_wkt":         _BOUNDARY_WKT_CACHE.get(country),
+            "current_access":       _get_baseline(km, country=country),
             "total_new_facilities": MAX_NEW_FACILITIES,
-            "location":            loc,
+            "location":             loc,
         }
 
 
-# ── 3. Fetch existing facilities (province-scoped on location change) ─────────
+# ── 4. Fetch existing facilities (scoped to location + country) ───────────────
 
 @app.callback(
     Output("store-existing-facilities", "data"),
     Input("store-location", "data"),
+    State("store-country",  "data"),
 )
-def fetch_existing_facilities(location):
+def fetch_existing_facilities(location, country):
     """
     Load existing health facilities scoped to the selected location.
 
-    When location == "zambia" the full national table is queried.
-    For any province the dedicated per-province OSM table is used:
-        health_facilities_zmb_osm_{slug}_province
-
-    This means the map, the KPI count ("Number of health facilities"), and
-    the baseline facility count used by the accessibility chart all reflect
-    only the facilities that actually belong to the selected province —
-    eliminating the whole-country scatter bleed visible in the earlier build.
-
-    QueryService caches each table result independently, so switching
-    between provinces after the first load is near-instant.
+    For country-level views, the full national table is queried.
+    For subnational views, the dedicated per-unit table is used so the map
+    only shows facilities that belong to that unit.
     """
-    loc = location or "zambia"
+    country = country or DEFAULT_COUNTRY
+    loc     = location or country
+
     try:
-        df = db.get_existing_facilities_for_location(loc)
-        logging.info("Loaded %d facilities for location='%s'", len(df), loc)
+        df = db.get_existing_facilities_for_location(loc, country=country)
+        logging.info(
+            "Loaded %d facilities for country='%s' location='%s'", len(df), country, loc,
+        )
         return df.to_dict("records")
     except Exception as exc:
         logging.error(
-            "fetch_existing_facilities error for location='%s': %s", loc, exc
+            "fetch_existing_facilities error (country=%s location=%s): %s",
+            country, loc, exc,
         )
         return []
 
 
-# ── 4. Fetch MCLP optimisation results ───────────────────────────────────────
+# ── 5. Fetch MCLP optimisation results ───────────────────────────────────────
 
 @app.callback(
     Output("store-accessibility-results", "data"),
     Input("store-distance-km", "data"),
     Input("store-location",    "data"),
+    State("store-country",     "data"),
 )
-def fetch_accessibility_results(distance_km, location):
+def fetch_accessibility_results(distance_km, location, country):
     """Re-fetch results whenever distance or location changes."""
-    loc = location or "zambia"
-    km  = distance_km if distance_km is not None else 5
+    country = country or DEFAULT_COUNTRY
+    loc     = location or country
+    km      = distance_km if distance_km is not None else 5
+
     try:
-        df = db.get_accessibility_results_for_location(loc, km)
+        df = db.get_accessibility_results_for_location(loc, km, country=country)
         return df.to_dict("records")
     except Exception as exc:
-        logging.error("fetch_accessibility_results error: %s", exc)
+        logging.error(
+            "fetch_accessibility_results error (country=%s loc=%s km=%s): %s",
+            country, loc, km, exc,
+        )
         return []
 
 
-# ── 5. Sync distance store from Value dropdown ────────────────────────────────
+# ── 6. Sync distance store from Value dropdown ────────────────────────────────
 
 @app.callback(
     Output("store-distance-km", "data"),
@@ -1095,7 +1195,7 @@ def sync_distance_store(value):
     return value if value is not None else 5
 
 
-# ── 6. Reset on distance switch ───────────────────────────────────────────────
+# ── 7. Reset on distance switch ───────────────────────────────────────────────
 
 @app.callback(
     Output("store-n-new",      "data", allow_duplicate=True),
@@ -1104,11 +1204,10 @@ def sync_distance_store(value):
     prevent_initial_call=True,
 )
 def reset_on_distance_change(distance_km):
-    """On distance switch: reset stepper to 0 and deactivate map."""
     return 0, False
 
 
-# ── 7. Reset on location switch ───────────────────────────────────────────────
+# ── 8. Reset on location switch ───────────────────────────────────────────────
 
 @app.callback(
     Output("store-n-new",      "data", allow_duplicate=True),
@@ -1117,22 +1216,20 @@ def reset_on_distance_change(distance_km):
     prevent_initial_call=True,
 )
 def reset_on_location_change(location):
-    """On location switch: reset stepper to 0 and deactivate map."""
     return 0, False
 
 
-# ── 8. Travel mode → Measure (auto, read-only) ────────────────────────────────
+# ── 9. Travel mode → Measure (auto, read-only) ────────────────────────────────
 
 @app.callback(
     Output("dropdown-measure", "value"),
     Input("dropdown-travel-mode", "value"),
 )
 def update_measure_on_travel_mode(travel_mode):
-    """Auto-set the Measure dropdown whenever Travel mode changes."""
     return "Distance" if travel_mode == "Driving" else "Time"
 
 
-# ── 9. Travel mode → Value dropdown options ───────────────────────────────────
+# ── 10. Travel mode → Value dropdown options ──────────────────────────────────
 
 @app.callback(
     Output("dropdown-distance-km", "options"),
@@ -1140,11 +1237,6 @@ def update_measure_on_travel_mode(travel_mode):
     Input("dropdown-travel-mode", "value"),
 )
 def update_value_dropdown_on_travel_mode(travel_mode):
-    """
-    Swap Value dropdown options and reset selection when Travel mode changes.
-      Driving → 5 km / 10 km  (default 5 km)
-      Walking → 30 min / 1 hr (default 30 min)
-    """
     if travel_mode == "Walking":
         return [
             {"label": "30 min", "value": "30min"},
@@ -1156,7 +1248,7 @@ def update_value_dropdown_on_travel_mode(travel_mode):
     ], 5
 
 
-# ── 10. Distance value label in Current Accessibility description ──────────────
+# ── 11. Distance value label in Current Accessibility description ─────────────
 
 @app.callback(
     Output("distance-value-label", "children"),
@@ -1167,7 +1259,7 @@ def update_distance_value_label(distance_km):
     return label_map.get(distance_km, "5 km")
 
 
-# ── 11. Travel mode description in Current Accessibility ─────────────────────
+# ── 12. Travel mode description in Current Accessibility ─────────────────────
 
 @app.callback(
     Output("travel-mode-description", "children"),
@@ -1179,46 +1271,76 @@ def update_travel_mode_description(travel_mode):
     return [html.I("distance"), " by driving"]
 
 
-# ── 12. Legend boundary label (shows "Zambia boundary" or "{Province} boundary") ─
+# ── 13. Header title (country-aware) ─────────────────────────────────────────
+
+@app.callback(
+    Output("header-title", "children"),
+    Input("store-country", "data"),
+)
+def update_header_title(country):
+    cfg = get_country_config(country)
+    return f"{cfg['display_name']} Health Access"
+
+
+# ── 14. Footer text (country-aware) ──────────────────────────────────────────
+
+@app.callback(
+    Output("footer-text", "children"),
+    Input("store-country", "data"),
+)
+def update_footer_text(country):
+    cfg = get_country_config(country)
+    return f"World Bank · Public Infrastructure Investment · GoAT · {cfg['display_name']} 2025"
+
+
+# ── 15. Legend boundary label ─────────────────────────────────────────────────
 
 @app.callback(
     Output("legend-boundary-label", "children"),
     Input("store-location", "data"),
+    State("store-country",  "data"),
 )
-def update_legend_boundary_label(location):
-    if not location or location == "zambia":
-        return "Zambia boundary"
+def update_legend_boundary_label(location, country):
+    """Show '<Country> boundary' at country level, '<Unit> boundary' at subnational."""
+    country = country or DEFAULT_COUNTRY
+    cfg     = get_country_config(country)
+
+    if not location or location.lower() == country.lower():
+        return f"{cfg['display_name']} boundary"
     return f"{location} boundary"
 
 
-# ── 12b. Location label in Current Accessibility description ────────────────────
+# ── 16. Location label in Current Accessibility description ───────────────────
 
 @app.callback(
     Output("location-label-detail", "children"),
     Input("store-location", "data"),
+    State("store-country",  "data"),
 )
-def update_location_label_detail(location):
-    """Display the selected location (country or province) in the accessibility label."""
-    if not location or location == "zambia":
-        return "Zambia"
-    # Format province name: capitalize first letter of each word
+def update_location_label_detail(location, country):
+    country = country or DEFAULT_COUNTRY
+    cfg     = get_country_config(country)
+    if not location or location.lower() == country.lower():
+        return cfg["display_name"]
     return location.title()
 
 
-# ── 12c. Location label in Current Accessibility (facilities count) ────────────
+# ── 17. Location label in facilities count ────────────────────────────────────
 
 @app.callback(
     Output("ca-location-label", "children"),
     Input("store-location", "data"),
+    State("store-country",  "data"),
 )
-def update_ca_location_label(location):
-    """Display the selected location in the facilities count label."""
-    if not location or location == "zambia":
-        return "Zambia"
+def update_ca_location_label(location, country):
+    country = country or DEFAULT_COUNTRY
+    cfg     = get_country_config(country)
+    if not location or location.lower() == country.lower():
+        return cfg["display_name"]
     return location.title()
 
 
-# ── 13. Stepper: +/- buttons update store-n-new ──────────────────────────────
+# ── 18. Stepper: +/- buttons update store-n-new ──────────────────────────────
 
 @app.callback(
     Output("store-n-new", "data"),
@@ -1240,7 +1362,7 @@ def update_stepper(inc, dec, inc2, dec2, current):
     return n
 
 
-# ── 14. View / Clear button toggle ───────────────────────────────────────────
+# ── 19. View / Clear button toggle ───────────────────────────────────────────
 
 @app.callback(
     Output("store-map-active", "data"),
@@ -1255,7 +1377,7 @@ def handle_button_click(n_clicks, is_active):
     return True, no_update
 
 
-# ── 15. View / Clear button label + style ─────────────────────────────────────
+# ── 20. View / Clear button label + style ────────────────────────────────────
 
 @app.callback(
     Output("btn-view-locations", "children"),
@@ -1281,7 +1403,7 @@ def update_button(is_active, n_new, results_records, existing_records, distance_
     )
 
 
-# ── 16. Stepper display sync ──────────────────────────────────────────────────
+# ── 21. Stepper display sync ──────────────────────────────────────────────────
 
 @app.callback(
     Output("stepper-display",        "children"),
@@ -1291,10 +1413,13 @@ def update_button(is_active, n_new, results_records, existing_records, distance_
     State("store-existing-facilities",    "data"),
     State("store-distance-km",            "data"),
     State("store-base-data",              "data"),
+    State("store-country",                "data"),
 )
-def sync_stepper_display(n_new, results_records, existing_records, distance_km, base_data):
+def sync_stepper_display(n_new, results_records, existing_records,
+                         distance_km, base_data, country):
+    country  = country or DEFAULT_COUNTRY
     n_new    = n_new or 0
-    baseline = _get_baseline(distance_km, base_data)
+    baseline = _get_baseline(distance_km, base_data, country)
 
     if results_records and existing_records:
         results_df  = pd.DataFrame(results_records)
@@ -1302,12 +1427,12 @@ def sync_stepper_display(n_new, results_records, existing_records, distance_km, 
         access_pct  = get_access_pct(results_df, n_new, n_existing, baseline)
         access_text = f"{access_pct:.2f}%"
     else:
-        access_text = f"{baseline:.2f}%"
+        access_text = f"{baseline:.2f}%" if baseline else "—"
 
     return str(n_new), access_text
 
 
-# ── 17. Map ───────────────────────────────────────────────────────────────────
+# ── 22. Map ───────────────────────────────────────────────────────────────────
 
 @app.callback(
     Output("map-container", "children"),
@@ -1316,54 +1441,62 @@ def sync_stepper_display(n_new, results_records, existing_records, distance_km, 
     Input("store-existing-facilities", "data"),
     Input("store-distance-km",         "data"),
     Input("store-n-new",               "data"),
-    Input("store-base-data",           "data"),   # triggers on location change
+    Input("store-base-data",           "data"),   # triggers on location/country change
 
-    State("store-map-active",          "data"),
+    State("store-map-active",           "data"),
     State("store-accessibility-results","data"),
-    State("store-location",            "data"),   # used only for cache key
+    State("store-location",             "data"),
+    State("store-country",              "data"),
 
     prevent_initial_call=False,
 )
 def update_map(n_clicks, existing_records, distance_km, n_new, base_data,
-               is_map_active, results_records, location):
+               is_map_active, results_records, location, country):
     """
-    Returns a complete dcc.Graph element (not just a figure) so that React
-    remounts the graph fresh on every meaningful state change.
+    Returns a complete dcc.Graph element (not just a figure) so React remounts
+    the graph fresh on every meaningful state change.
 
-    The `key` on the returned dcc.Graph is what forces the remount:
-      • standard map   → key "std-{loc}-{km}"              (stable per location+km)
-      • optimised map  → key "opt-{loc}-{km}-{nc}-{n}"     (changes on every click)
-      • cleared map    → key "clr-{loc}-{km}-{nc}"
+    The `key` on the returned dcc.Graph forces the remount:
+      standard map  → key "std-{country}-{loc}-{km}"
+      optimised map → key "opt-{country}-{loc}-{km}-{nc}-{n}"
+      cleared map   → key "clr-{country}-{loc}-{km}-{nc}"
 
-    Including `loc` in the key guarantees a full remount on location switches,
-    even when km and n_new are unchanged.
+    Including both country and loc in the key guarantees a full remount on
+    country or location switches, even when km and n_new are unchanged.
     """
-    km     = distance_km or 5
-    n_new  = n_new or 0
-    clicks = n_clicks or 0
-    loc    = (location or "zambia").lower().replace(" ", "_").replace("-", "_")
-
+    country   = country or DEFAULT_COUNTRY
+    cfg       = get_country_config(country)
+    km        = distance_km or 5
+    n_new     = n_new or 0
+    clicks    = n_clicks or 0
+    loc_slug  = (location or country).lower().replace(" ", "_").replace("-", "_")
     triggered = ctx.triggered_id
 
     # ── Extract dynamic map config from base_data ──────────────────────────────
-    boundary_wkt = _BOUNDARY_WKT   # synchronous startup fallback
-    center_lat   = ZAMBIA_CENTER_LAT
-    center_lon   = ZAMBIA_CENTER_LON
-    zoom         = MAP_ZOOM
+    # Fallback values come from the country config, not hardcoded Zambia constants.
+    boundary_wkt = _BOUNDARY_WKT_CACHE.get(country)   # startup pre-warm cache
+    center_lat   = cfg["center_lat"]
+    center_lon   = cfg["center_lon"]
+    zoom         = cfg["map_zoom"]
 
     if base_data:
-        boundary_wkt = base_data.get("geometry_wkt") or _BOUNDARY_WKT
-        center_lat   = base_data.get("center_lat",  ZAMBIA_CENTER_LAT)
-        center_lon   = base_data.get("center_lon",  ZAMBIA_CENTER_LON)
-        zoom         = base_data.get("zoom",        MAP_ZOOM)
+        boundary_wkt = base_data.get("geometry_wkt") or boundary_wkt
+        center_lat   = base_data.get("center_lat",  center_lat)
+        center_lon   = base_data.get("center_lon",  center_lon)
+        zoom         = base_data.get("zoom",        zoom)
+        # Cache the boundary WKT for this country so future renders
+        # have a synchronous fallback without a DB round-trip.
+        if base_data.get("geometry_wkt"):
+            _BOUNDARY_WKT_CACHE[country] = base_data["geometry_wkt"]
 
-    # ── No data yet ────────────────────────────────────────────────────────────
+    # Stable map key prefix: encodes country + location + distance
+    key_prefix = f"{country}-{loc_slug}-{km}"
+
     if existing_records is None:
-        return _make_graph(_empty_figure(500), key=f"empty-{loc}-{km}")
+        return _make_graph(_empty_figure(500), key=f"empty-{key_prefix}")
 
     existing_df = pd.DataFrame(existing_records)
 
-    # ── Helper: build standard map with current config ─────────────────────────
     def _std_map(uirevision="standard"):
         return build_standard_map(
             existing_df,
@@ -1385,22 +1518,20 @@ def update_map(n_clicks, existing_records, distance_km, n_new, base_data,
             zoom=zoom,
         )
 
-    # ── Initial load / distance switch / location change → standard map ────────
+    # ── Initial load / distance switch / location or country change ────────────
     if triggered in (None, "store-existing-facilities", "store-distance-km", "store-base-data"):
-        logging.info("Standard map  trigger=%s loc=%s km=%s", triggered, loc, km)
-        return _make_graph(_std_map(), key=f"std-{loc}-{km}")
+        logging.info("Standard map  trigger=%s country=%s loc=%s km=%s",
+                     triggered, country, loc_slug, km)
+        return _make_graph(_std_map(), key=f"std-{key_prefix}")
 
     # ── Stepper changed ────────────────────────────────────────────────────────
     if triggered == "store-n-new":
         if n_new == 0:
-            logging.info("Stepper → 0, clearing map  loc=%s km=%s", loc, km)
-            return _make_graph(_std_map(), key=f"clr-{loc}-{km}-{clicks}")
+            return _make_graph(_std_map(), key=f"clr-{key_prefix}-{clicks}")
 
         if is_map_active and results_records:
-            logging.info("Stepper → %d facilities on live map  loc=%s", n_new, loc)
-            return _make_graph(_opt_map(), key=f"opt-{loc}-{km}-{clicks}-{n_new}")
+            return _make_graph(_opt_map(), key=f"opt-{key_prefix}-{clicks}-{n_new}")
 
-        logging.info("Stepper → %d, map not active yet", n_new)
         return no_update
 
     # ── Button click ───────────────────────────────────────────────────────────
@@ -1408,17 +1539,18 @@ def update_map(n_clicks, existing_records, distance_km, n_new, base_data,
         viewing = not is_map_active
 
         if viewing and results_records:
-            logging.info("View locations: %d facilities  loc=%s", n_new, loc)
-            return _make_graph(_opt_map(), key=f"opt-{loc}-{km}-{clicks}-{n_new}")
+            logging.info("View locations: %d facilities  country=%s loc=%s",
+                         n_new, country, loc_slug)
+            return _make_graph(_opt_map(), key=f"opt-{key_prefix}-{clicks}-{n_new}")
 
-        logging.info("Clear map  loc=%s clicks=%d", loc, clicks)
-        return _make_graph(_std_map(), key=f"clr-{loc}-{km}-{clicks}")
+        logging.info("Clear map  country=%s loc=%s clicks=%d", country, loc_slug, clicks)
+        return _make_graph(_std_map(), key=f"clr-{key_prefix}-{clicks}")
 
     logging.warning("Unhandled trigger: %s", triggered)
     return no_update
 
 
-# ── 18. KPI cards, accessibility chart, recommended table ────────────────────
+# ── 23. KPI cards, accessibility chart, recommended table ────────────────────
 
 @app.callback(
     Output("ca-total-fac",        "children"),
@@ -1433,14 +1565,21 @@ def update_map(n_clicks, existing_records, distance_km, n_new, base_data,
     Input("store-accessibility-results",  "data"),
     State("store-distance-km",            "data"),
     State("store-base-data",              "data"),
+    State("store-country",                "data"),
 )
-def update_stats(n_new, existing_records, results_records, distance_km, base_data):
+def update_stats(n_new, existing_records, results_records,
+                 distance_km, base_data, country):
     """
     Update KPI cards, accessibility chart, and recommended table on every
-    stepper or data change — instant feedback without touching the map.
-    Baseline is taken from store-base-data (live DB value) or falls back
-    to the hardcoded constants in constants.py.
+    stepper or data change.
+
+    The country_population from COUNTRY_CONFIGS is passed to
+    get_recommended_table_rows so the "new people reached" figure reflects the
+    correct national population for non-Zambia countries.
     """
+    country = country or DEFAULT_COUNTRY
+    cfg     = get_country_config(country)
+
     if existing_records is None or results_records is None:
         return (
             "—", "—", "—", "—",
@@ -1450,27 +1589,32 @@ def update_stats(n_new, existing_records, results_records, distance_km, base_dat
         )
 
     n_new       = n_new or 0
-    baseline    = _get_baseline(distance_km, base_data)
+    baseline    = _get_baseline(distance_km, base_data, country)
     existing_df = pd.DataFrame(existing_records)
     results_df  = pd.DataFrame(results_records)
     n_existing  = len(existing_df)
 
-    cur_pct     = get_access_pct(results_df, 0,     n_existing, baseline)
-    access_pct  = get_access_pct(results_df, n_new, n_existing, baseline)
-    delta_pct   = round(access_pct - baseline, 2) if n_new > 0 else 0.0
+    cur_pct    = get_access_pct(results_df, 0,     n_existing, baseline)
+    access_pct = get_access_pct(results_df, n_new, n_existing, baseline)
+    delta_pct  = round(access_pct - baseline, 2) if n_new > 0 else 0.0
 
-    ca_total    = f"{n_existing:,}"
-    ca_pct      = f"{cur_pct:.2f}%"
-    om_n_new    = str(n_new)
-    om_pct      = f"{access_pct:.2f}%"
+    ca_total   = f"{n_existing:,}"
+    ca_pct     = f"{cur_pct:.2f}%"
+    om_n_new   = str(n_new)
+    om_pct     = f"{access_pct:.2f}%"
     delta_label = (
         "current baseline"
         if n_new == 0
         else f"{format_delta(delta_pct)} vs baseline"
     )
     chart      = build_accessibility_chart(results_df, n_new, n_existing, baseline)
-    table_rows = get_recommended_table_rows(results_df, n_new, baseline)
-    table      = build_recommended_table(table_rows)
+    table_rows = get_recommended_table_rows(
+        results_df,
+        n_new,
+        baseline,
+        country_population=cfg["population"],   # ← country-specific population
+    )
+    table = build_recommended_table(table_rows)
 
     return (ca_total, ca_pct, om_n_new, om_pct, delta_label, chart, table)
 
