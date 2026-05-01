@@ -2,6 +2,12 @@
 
 A **multi-country Databricks Data App** built with Dash that visualises the location and population accessibility of health facilities for any configured country. It allows users to simulate the addition of up to 50 optimally-placed new facilities and instantly see the projected improvement in population coverage.
 
+World Bank Data Analytics Deployment: https://datanalytics.worldbank.org/content/1cc36c57-f12d-4aa8-92a2-196bb0ea605f/
+
+Internal Domain: http://w0lxdshyprd1c01.worldbank.org/
+
+Zambia Geospatial Hub: https://zmb-geowb.hub.arcgis.com/apps/4914d79a40414336998281d0827847a3/explore
+
 The active country is selected via a URL query parameter — a single codebase powers a separate, fully-branded geospatial hub for each country.
 
 ```
