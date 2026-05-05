@@ -401,6 +401,7 @@ class QueryService:
                 total_population_access_pct,
                 district
             FROM {cat}.{schema}.{table}
+            WHERE new_facility LIKE '%_potential'
             ORDER BY total_facilities ASC
         """
         df = self.execute_query(query)

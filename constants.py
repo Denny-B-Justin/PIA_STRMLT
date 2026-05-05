@@ -185,7 +185,94 @@ COUNTRY_CONFIGS: dict = {
         "country_results_template":      "lgu_accessibility_results_mwi_{suffix}",
         "province_results_template":     "lgu_accessibility_results_mwi_{slug}_region_province_{suffix}",
     },
+
+    "serbia": {
+        # ── Display ───────────────────────────────────────────────────────────
+        "display_name":     "Serbia",
+        "iso3":             "srb",
+
+        # ── Map defaults ──────────────────────────────────────────────────────
+        # Serbia spans roughly 42.2°N–46.8°N, 18.8°E–23.0°E
+        "center_lat":       44.0165,
+        "center_lon":       20.9029,
+        "map_zoom":         6.0,
+        "province_zoom":    7.0,
+
+        # ── Population (2023 World Bank estimate) ─────────────────────────────
+        "population":       9_515_039,
+
+        # ── Databricks catalog / schema ───────────────────────────────────────
+        # Set SERBIA_CATALOG, SERBIA_FACILITIES_SCHEMA, SERBIA_RESULTS_SCHEMA
+        # as env vars on Posit Connect before enabling this country.
+        "catalog_env":               "SERBIA_CATALOG",
+        "catalog_default":           "prd_mega",
+        "facilities_schema_env":     "SERBIA_FACILITIES_SCHEMA",
+        "facilities_schema_default": "sgpbpi163",
+        "results_schema_env":        "SERBIA_RESULTS_SCHEMA",
+        "results_schema_default":    "sgpbpi163",
+
+        # ── Sub-national administrative units ─────────────────────────────────
+        # Serbia has 3 regions; each contains districts.  Using regions as the
+        # top-level granularity here; extend to districts when pipeline is ready.
+        "subnational_label": "Districts",
+        "subnational_units": [
+            'Borski', 'Branicevski', 'Grad Beograd', 'Jablanicki', 'Juzno-backi', 
+            'Juzno-banatski', 'Kolubarski', 'Macvanski', 'Moravicki', 'Nisavski', 
+            'Pcinjski', 'Pirotski', 'Podunavski', 'Pomoravski', 'Rasinski', 'Raski', 
+            'Severno-backi', 'Severno-banatski', 'Srednje-banatski', 'Sremski', 
+            'Sumadijski', 'Toplicki', 'Zajecarski', 'Zapadno-backi', 'Zlatiborski'
+        ],
+        "subnational_slugs": {
+            "Borski": "borski",
+            "Branicevski": "branicevski",
+            "Grad Beograd": "grad_beograd",
+            "Jablanicki": "jablanicki",
+            "Juzno-backi": "juzno_backi",
+            "Juzno-banatski": "juzno_banatski",
+            "Kolubarski": "kolubarski",
+            "Macvanski": "macvanski",
+            "Moravicki": "moravicki",
+            "Nisavski": "nisavski",
+            "Pcinjski": "pcinjski",
+            "Pirotski": "pirotski",
+            "Podunavski": "podunavski",
+            "Pomoravski": "pomoravski",
+            "Rasinski": "rasinski",
+            "Raski": "raski",
+            "Severno-backi": "severno_backi",
+            "Severno-banatski": "severno_banatski",
+            "Srednje-banatski": "srednje_banatski",
+            "Sremski": "sremski",
+            "Sumadijski": "sumadijski",
+            "Toplicki": "toplicki",
+            "Zajecarski": "zajecarski",
+            "Zapadno-backi": "zapadno_backi",
+            "Zlatiborski": "zlatiborski",
+        },
+
+        # ── Distance bands (same convention as Zambia) ────────────────────────
+        "distance_km_map": {5: 5, 10: 10, "30min": 2, "1hr": 4},
+
+        # ── Hardcoded baseline fallbacks ──────────────────────────────────────
+        # Update once Serbia baseline data is available in Databricks.
+        "fallback_baselines": {
+            5:       0.0,
+            10:      0.0,
+            "30min": 0.0,
+            "1hr":   0.0,
+        },
+
+        # ── Table naming conventions (mirror Zambia; zmb → mwi) ───────────────
+        "db_country_name":               "Serbia",
+        "base_table":                    "base_dashboard_data_srb",
+        "country_facilities_table":      "health_facilities_srb_osm",
+        "province_facilities_template":  "health_facilities_srb_osm_{slug}_province",
+        "results_suffix_map": {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"},
+        "country_results_template":      "lgu_accessibility_results_srb_{suffix}",
+        "province_results_template":     "lgu_accessibility_results_srb_{slug}_province_{suffix}",
+    },
 }
+    
 
 # ── Registry helpers ───────────────────────────────────────────────────────────
 
