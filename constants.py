@@ -271,6 +271,71 @@ COUNTRY_CONFIGS: dict = {
         "country_results_template":      "lgu_accessibility_results_srb_{suffix}",
         "province_results_template":     "lgu_accessibility_results_srb_{slug}_province_{suffix}",
     },
+
+    "nepal": {
+        # ── Display ───────────────────────────────────────────────────────────
+        "display_name":     "Nepal",
+        "iso3":             "npl",
+
+        # ── Map defaults ──────────────────────────────────────────────────────
+        # Nepal spans roughly 26.4°N–30.4°N, 80.0°E–88.2°E
+        "center_lat":       28.37,
+        "center_lon":       84.30,
+        "map_zoom":         6.0,
+        "province_zoom":    7.0,
+
+        # ── Population (2025 World Bank estimate) ─────────────────────────────
+        "population":       29_543_807,
+
+        # ── Databricks catalog / schema ───────────────────────────────────────
+        # Set NEPAL_CATALOG, NEPAL_FACILITIES_SCHEMA, NEPAL_RESULTS_SCHEMA
+        # as env vars on Posit Connect before enabling this country.
+        "catalog_env":               "NEPAL_CATALOG",
+        "catalog_default":           "prd_mega",
+        "facilities_schema_env":     "NEPAL_FACILITIES_SCHEMA",
+        "facilities_schema_default": "sgpbpi163",
+        "results_schema_env":        "NEPAL_RESULTS_SCHEMA",
+        "results_schema_default":    "sgpbpi163",
+
+        # ── Sub-national administrative units ─────────────────────────────────
+        # Nepal has 7 provinces; each contains districts.  Using regions as the
+        # top-level granularity here; extend to districts when pipeline is ready.
+        "subnational_label": "Region",
+        "subnational_units": [
+            'Bagmati', 'Gandaki', 'Karnali', 'Koshi', 
+            'Lumbini', 'Madhesh', 'Sudurpashchim',
+        ],
+        "subnational_slugs": {
+            "Bagmati": "bagmati",
+            "Gandaki": "gandaki",
+            "Karnali": "karnali",
+            "Koshi": "koshi",
+            "Lumbini": "lumbini",
+            "Madhesh": "madhesh",
+            "Sudurpashchim": "sudurpashchim",
+        },
+
+        # ── Distance bands (same convention as Zambia) ────────────────────────
+        "distance_km_map": {5: 5, 10: 10, "30min": 2, "1hr": 4},
+
+        # ── Hardcoded baseline fallbacks ──────────────────────────────────────
+        # Update once Malawi baseline data is available in Databricks.
+        "fallback_baselines": {
+            5:       0.0,
+            10:      0.0,
+            "30min": 0.0,
+            "1hr":   0.0,
+        },
+
+        # ── Table naming conventions (mirror Zambia; zmb → mwi) ───────────────
+        "db_country_name":               "Nepal",
+        "base_table":                    "base_dashboard_data_npl",
+        "country_facilities_table":      "health_facilities_npl_osm",
+        "province_facilities_template":  "health_facilities_npl_osm_{slug}_province",
+        "results_suffix_map": {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"},
+        "country_results_template":      "lgu_accessibility_results_npl_{suffix}",
+        "province_results_template":     "lgu_accessibility_results_npl_{slug}_province_{suffix}",
+    },
 }
     
 
