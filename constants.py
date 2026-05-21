@@ -346,7 +346,7 @@ COUNTRY_CONFIGS: dict = {
         # Uzbekistan spans roughly 39.5°N–42.8°N, 64.0°E–73.0°E
         "center_lat":       40.5,
         "center_lon":       68.5,
-        "map_zoom":         5.0,
+        "map_zoom":         4.5,
         "province_zoom":    6.0,
 
         # ── Population (2025 World Bank estimate) ─────────────────────────────
