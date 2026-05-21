@@ -138,7 +138,7 @@ COUNTRY_CONFIGS: dict = {
         "map_zoom":         6.0,
         "province_zoom":    7.0,
 
-        # ── Population (2023 World Bank estimate) ─────────────────────────────
+        # ── Population (2025 World Bank estimate) ─────────────────────────────
         "population":       20_931_751,
 
         # ── Databricks catalog / schema ───────────────────────────────────────
@@ -198,7 +198,7 @@ COUNTRY_CONFIGS: dict = {
         "map_zoom":         6.0,
         "province_zoom":    7.0,
 
-        # ── Population (2023 World Bank estimate) ─────────────────────────────
+        # ── Population (2025 World Bank estimate) ─────────────────────────────
         "population":       9_515_039,
 
         # ── Databricks catalog / schema ───────────────────────────────────────
@@ -300,7 +300,7 @@ COUNTRY_CONFIGS: dict = {
         # ── Sub-national administrative units ─────────────────────────────────
         # Nepal has 7 provinces; each contains districts.  Using regions as the
         # top-level granularity here; extend to districts when pipeline is ready.
-        "subnational_label": "Region",
+        "subnational_label": "Province",
         "subnational_units": [
             'Bagmati', 'Gandaki', 'Karnali', 'Koshi', 
             'Lumbini', 'Madhesh', 'Sudurpashchim',
@@ -335,6 +335,79 @@ COUNTRY_CONFIGS: dict = {
         "results_suffix_map": {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"},
         "country_results_template":      "lgu_accessibility_results_npl_{suffix}",
         "province_results_template":     "lgu_accessibility_results_npl_{slug}_province_{suffix}",
+    },
+
+    "uzbekistan": {
+        # ── Display ───────────────────────────────────────────────────────────
+        "display_name":     "Uzbekistan",
+        "iso3":             "uzb",
+
+        # ── Map defaults ──────────────────────────────────────────────────────
+        # Uzbekistan spans roughly 39.5°N–42.8°N, 64.0°E–73.0°E
+        "center_lat":       40.5,
+        "center_lon":       68.5,
+        "map_zoom":         5.0,
+        "province_zoom":    6.0,
+
+        # ── Population (2025 World Bank estimate) ─────────────────────────────
+        "population":       36_586_558,
+
+        # ── Databricks catalog / schema ───────────────────────────────────────
+        # Set UZBEKISTAN_CATALOG, UZBEKISTAN_FACILITIES_SCHEMA, UZBEKISTAN_RESULTS_SCHEMA
+        # as env vars on Posit Connect before enabling this country.
+        "catalog_env":               "UZBEKISTAN_CATALOG",
+        "catalog_default":           "prd_mega",
+        "facilities_schema_env":     "UZBEKISTAN_FACILITIES_SCHEMA",
+        "facilities_schema_default": "sgpbpi163",
+        "results_schema_env":        "UZBEKISTAN_RESULTS_SCHEMA",
+        "results_schema_default":    "sgpbpi163",
+
+        # ── Sub-national administrative units ─────────────────────────────────
+        # Uzbekistan has 12 regions; each contains districts.  Using regions as the
+        # top-level granularity here; extend to districts when pipeline is ready.
+        "subnational_label": "Province",
+        "subnational_units": [
+            'Andijan', 'Bukhara', 'Fergana', 'Jizzakh', 'Karakalpakstan', 
+            'Kashkadarya', 'Khorezm', 'Namangan', 'Navoiy', 'Samarkand', 
+            'Sirdarya', 'Surkhandarya', 'Tashkent', 'Tashkent city'
+        ],
+        "subnational_slugs": {
+            "Andijan": "andijan",
+            "Bukhara": "bukhara",
+            "Fergana": "fergana",
+            "Jizzakh": "jizzakh",
+            "Karakalpakstan": "karakalpakstan",
+            "Kashkadarya": "kashkadarya",
+            "Khorezm": "khorezm",
+            "Namangan": "namangan",
+            "Navoiy": "navoiy",
+            "Samarkand": "samarkand",
+            "Sirdarya": "sirdarya",
+            "Surkhandarya": "surkhandarya",
+            "Tashkent": "tashkent",
+            "Tashkent city": "tashkent_city"
+        },
+
+        # ── Distance bands (same convention as Zambia) ────────────────────────
+        "distance_km_map": {5: 5, 10: 10, "30min": 2, "1hr": 4},
+
+        # ── Hardcoded baseline fallbacks ──────────────────────────────────────
+        # Update once Malawi baseline data is available in Databricks.
+        "fallback_baselines": {
+            5:       0.0,
+            10:      0.0,
+            "30min": 0.0,
+            "1hr":   0.0,
+        },
+
+        # ── Table naming conventions (mirror Zambia; zmb → mwi) ───────────────
+        "db_country_name":               "Uzbekistan",
+        "base_table":                    "base_dashboard_data_uzb",
+        "country_facilities_table":      "health_facilities_uzb_osm",
+        "province_facilities_template":  "health_facilities_uzb_osm_{slug}_province",
+        "results_suffix_map": {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"},
+        "country_results_template":      "lgu_accessibility_results_uzb_{suffix}",
+        "province_results_template":     "lgu_accessibility_results_uzb_{slug}_province_{suffix}",
     },
 }
     
