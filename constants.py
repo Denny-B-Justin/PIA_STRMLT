@@ -118,7 +118,7 @@ COUNTRY_CONFIGS: dict = {
         # ── Table naming conventions ──────────────────────────────────────────
         "db_country_name":               "Zambia",
         "base_table":                    "base_dashboard_data_zmb",
-        "country_facilities_table":      "health_facilities_zmb",
+        "country_facilities_table":      "health_facilities_zmb_osm",
         "province_facilities_template":  "health_facilities_zmb_osm_{slug}_province",
         "results_suffix_map": {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"},
         "country_results_template":      "lgu_accessibility_results_zmb_{suffix}",
