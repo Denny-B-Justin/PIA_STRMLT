@@ -47,7 +47,7 @@
 # # Primary baseline is always fetched live from the UC table.
 # BASELINE_ACCESS_PCT      = 79.31   # 10 km — kept for backward compat
 # BASELINE_ACCESS_PCT_10KM = 79.31
-# BASELINE_ACCESS_PCT_5KM  = 62.24
+# BASELINE_ACCESS_PCT_5KM  = 71.80
 # BASELINE_ACCESS_PCT_30MIN = 39.52  # 30 min walking (≈ 2 km)
 # BASELINE_ACCESS_PCT_1HR   = 56.36  # 1 hr  walking (≈ 4 km)
 
@@ -109,10 +109,10 @@ COUNTRY_CONFIGS: dict = {
         # ── Hardcoded baseline fallbacks ──────────────────────────────────────
         # Used ONLY when the DB is unreachable.  Live values come from the DB.
         "fallback_baselines": {
-            5:       62.24,
-            10:      79.31,
-            "30min": 39.52,
-            "1hr":   56.36,
+            5:       71.80,
+            10:      87.71,
+            "30min": 48.45,
+            "1hr":   66.04,
         },
 
         # ── Table naming conventions ──────────────────────────────────────────
@@ -170,10 +170,10 @@ COUNTRY_CONFIGS: dict = {
         # ── Hardcoded baseline fallbacks ──────────────────────────────────────
         # Update once Malawi baseline data is available in Databricks.
         "fallback_baselines": {
-            5:       0.0,
-            10:      0.0,
-            "30min": 0.0,
-            "1hr":   0.0,
+            5:       63.56,
+            10:      88.75,
+            "30min": 36.44,
+            "1hr":   55.52,
         },
 
         # ── Table naming conventions (mirror Zambia; zmb → mwi) ───────────────
@@ -256,10 +256,10 @@ COUNTRY_CONFIGS: dict = {
         # ── Hardcoded baseline fallbacks ──────────────────────────────────────
         # Update once Serbia baseline data is available in Databricks.
         "fallback_baselines": {
-            5:       0.0,
-            10:      0.0,
-            "30min": 0.0,
-            "1hr":   0.0,
+            5:       95.27,
+            10:      99.99,
+            "30min": 80.76,
+            "1hr":   91.62,
         },
 
         # ── Table naming conventions (mirror Zambia; zmb → mwi) ───────────────
@@ -321,10 +321,10 @@ COUNTRY_CONFIGS: dict = {
         # ── Hardcoded baseline fallbacks ──────────────────────────────────────
         # Update once Malawi baseline data is available in Databricks.
         "fallback_baselines": {
-            5:       0.0,
-            10:      0.0,
-            "30min": 0.0,
-            "1hr":   0.0,
+            5:       95.66,
+            10:      99.78,
+            "30min": 79.87,
+            "1hr":   92.47,
         },
 
         # ── Table naming conventions (mirror Zambia; zmb → mwi) ───────────────
@@ -394,10 +394,10 @@ COUNTRY_CONFIGS: dict = {
         # ── Hardcoded baseline fallbacks ──────────────────────────────────────
         # Update once Malawi baseline data is available in Databricks.
         "fallback_baselines": {
-            5:       0.0,
-            10:      0.0,
-            "30min": 0.0,
-            "1hr":   0.0,
+            5:       83.65,
+            10:      97.03,
+            "30min": 57.42,
+            "1hr":   77.36,
         },
 
         # ── Table naming conventions (mirror Zambia; zmb → mwi) ───────────────
