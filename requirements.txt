@@ -7,3 +7,4 @@ flask-login
 pandas
 python-dotenv
 bcrypt
+dash_bootstrap_components
