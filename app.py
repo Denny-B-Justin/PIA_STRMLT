@@ -883,7 +883,7 @@ def _about_content() -> html.Div:
                                         className="about-logo-item",
                                         children=[
                                             html.Img(
-                                                src="/assets/The-World-Bank-group-white.png",
+                                                src=app.get_asset_url('The-World-Bank-group-white.png'),
                                                 alt="World Bank",
                                                 className="about-partner-logo",
                                             ),
@@ -893,7 +893,7 @@ def _about_content() -> html.Div:
                                         className="about-logo-item",
                                         children=[
                                             html.Img(
-                                                src="/assets/Pim-pam_white_logo.png",
+                                                src=app.get_asset_url('Pim-pam_white_logo.png'),
                                                 alt="PIM-PAM",
                                                 className="about-partner-logo",
                                             ),
@@ -954,7 +954,7 @@ app.layout = html.Div(
                     style={"display": "flex", "alignItems": "center", "gap": "14px"},
                     children=[
                         html.Img(
-                            src="/assets/Logo.png",
+                            src=app.get_asset_url('Logo.png'),
                             style={"height": "55px", "width": "55px"},
                         ),
                         html.H1(
