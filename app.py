@@ -110,7 +110,7 @@ ACC_INDIGO = "#4F46E5"
 ACC_GREEN  = "#16A34A"
 ACC_RED    = "#DC2626"
 
-FONT_BODY  = "'Inter', sans-serif"
+FONT_BODY  = "Fira Sans" #'Inter', sans-serif
 FONT_MONO  = "'Space Mono', monospace"
 
 HEADER_H   = 68
@@ -233,10 +233,10 @@ CARD_STYLE = {
 }
 
 SECTION_TITLE_STYLE = {
-    "fontWeight": "900",
+    "fontWeight": "700",
     "fontSize": "0.78rem",
     "letterSpacing": "1.1px",
-    "textTransform": "uppercase",
+    "textTransform": "capitalize",
     "color": TEXT_HI,
     "marginBottom": "16px",
     "fontFamily": FONT_BODY,
