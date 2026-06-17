@@ -2,4 +2,3 @@ streamvenv
 .env
 __pycache__/
 app_previous.py
-goat_src
