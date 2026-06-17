@@ -40,8 +40,7 @@ COL_VALID_HIER     = "Valid_Hierarchy"          # "True" / "False" (string)
 KEYWORD_SEARCH_COLUMNS: list[str] = [
     "Indicators",
     "PriorActions",
-    "DLI_DLR",
-    "PROJ_OBJECTIVE_TEXT",
+    "PROJ_DEV_OBJECTIVE_DESC",
     "Components",
 ]
 
