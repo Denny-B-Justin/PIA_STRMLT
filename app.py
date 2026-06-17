@@ -50,7 +50,8 @@ app = dash.Dash(
     __name__,
     external_stylesheets=[
         dbc.themes.DARKLY,
-        "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css",
+        # "assets/bootstrap-icons/bootstrap-icons.css",
+        # "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css",
     ],
     suppress_callback_exceptions=True,
     title="GoAT",
@@ -58,6 +59,9 @@ app = dash.Dash(
 )
 server = app.server  # expose WSGI server for Posit Connect / gunicorn
 
+app.config.external_stylesheets.append(
+    app.get_asset_url("bootstrap-icons/bootstrap-icons.css")
+)
 # ── QueryService singleton ─────────────────────────────────────────────────────
 qs = QueryService.get_instance()
 

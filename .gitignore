@@ -1,4 +1,4 @@
 streamvenv
 .env
 __pycache__/
-app_previous.py
+node_modules/
