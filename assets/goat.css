@@ -96,12 +96,8 @@ html {
 }
 
 /* ── dcc.Dropdown — multi-value red pills ────────────────────────────────── */
-/*
- * These rules style the selected-item tags to match the red pill look
- * shown in the Streamlit screenshots.
- */
 
-.Select-multi-value-wrapper .Select-value {
+.dash-dropdown .Select--multi .Select-multi-value-wrapper .Select-value {
     background-color: #E63946 !important;
     border: 1px solid #C0392B !important;
     border-radius: 4px !important;
@@ -110,21 +106,21 @@ html {
     line-height: 1.4;
 }
 
-.Select-multi-value-wrapper .Select-value-label {
+.dash-dropdown .Select--multi .Select-multi-value-wrapper .Select-value-label {
     color: #FFFFFF !important;
     font-size: 12px !important;
     font-weight: 500;
     padding: 2px 6px !important;
 }
 
-.Select-multi-value-wrapper .Select-value-icon {
+.dash-dropdown .Select--multi .Select-multi-value-wrapper .Select-value-icon {
     color: rgba(255, 255, 255, 0.75) !important;
     border-right: 1px solid #C0392B !important;
     padding: 2px 5px !important;
     border-radius: 4px 0 0 4px !important;
 }
 
-.Select-multi-value-wrapper .Select-value-icon:hover {
+.dash-dropdown .Select--multi .Select-multi-value-wrapper .Select-value-icon:hover {
     background-color: #C0392B !important;
     color: #FFFFFF !important;
 }

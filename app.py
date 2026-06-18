@@ -79,6 +79,8 @@ _ACCENT     = "#E63946"
 _TEXT_PRI   = "#FFFFFF"
 _TEXT_SEC   = "#CBD5E0"
 _TEXT_MUTED = "#A0AEC0"
+_TEXT_DELETE = "#353A40"
+_TEXT_LABEL = "#6E7178"
 
 _SIDEBAR_STYLE = {
     "backgroundColor": _BG_SIDEBAR,
@@ -87,15 +89,21 @@ _SIDEBAR_STYLE = {
     "padding":         "20px 16px",
 }
 
-_FILTER_LABEL = {
-    "color":         _TEXT_MUTED,
-    "fontSize":      "11px",
-    "letterSpacing": "0.06em",
-    "marginBottom":  "6px",
-    "display":       "block",
+_DD_STYLE = {
+    "marginBottom":    "8px",
+    "backgroundColor": "transparent",
+    "color":         _TEXT_DELETE,
 }
 
-_DD_STYLE = {"marginBottom": "20px"}
+_FILTER_LABEL = {
+    "color":         _TEXT_LABEL,        # brighter — was _TEXT_MUTED
+    "fontSize":      "12px",           # slightly larger
+    "fontWeight":    "500",
+    "letterSpacing": "0.04em",
+    "marginBottom":  "8px",
+    "marginTop":     "4px",
+    "display":       "block",
+}
 
 _MAIN_TAB = {
     "color":           _TEXT_MUTED,
@@ -243,29 +251,21 @@ def _filter_sidebar() -> html.Div:
     return html.Div(
         style=_SIDEBAR_STYLE,
         children=[
-            html.Label("Select Lending Instrument", style=_FILTER_LABEL),
-            dcc.Dropdown(
-                id="dd-lending-instr",
-                multi=True,
-                placeholder="Loading…",
-                style=_DD_STYLE,
-                optionHeight=40,
-            ),
-            html.Label("Select Region", style=_FILTER_LABEL),
-            dcc.Dropdown(
-                id="dd-region",
-                multi=True,
-                placeholder="Loading…",
-                style=_DD_STYLE,
-                optionHeight=40,
-            ),
-            html.Label("Filter by Keywords", style=_FILTER_LABEL),
-            dcc.Dropdown(
-                id="dd-keywords",
-                multi=True,
-                placeholder="Choose hierarchy",
-                style=_DD_STYLE,
-            ),
+            html.Div([
+                html.Label("Select Lending Instrument", style=_FILTER_LABEL),
+                dcc.Dropdown(id="dd-lending-instr", multi=True, placeholder="Loading…",
+                            style=_DD_STYLE, optionHeight=40),
+            ], style={"marginBottom": "20px"}),
+            html.Div([
+                html.Label("Select Region", style=_FILTER_LABEL),
+                dcc.Dropdown(id="dd-region", multi=True, placeholder="Loading…",
+                            style=_DD_STYLE, optionHeight=40),
+            ], style={"marginBottom": "20px"}),
+            html.Div([
+                html.Label("Filter by Keywords", style=_FILTER_LABEL),
+                dcc.Dropdown(id="dd-keywords", multi=True, placeholder="Choose hierarchy",
+                            style=_DD_STYLE),
+            ], style={"marginBottom": "20px"}),
             html.Label("Keyword filter logic", style=_FILTER_LABEL),
             dcc.RadioItems(
                 id="radio-and-or",
@@ -534,8 +534,8 @@ def _keywords_add_new() -> html.Div:
                     html.Div(
                         [
                             html.I(className="bi bi-info-circle me-2"),
-                            "This will search ~10,000 project records. "
-                            "Processing may take 30–90 seconds.",
+                            "This will search World Bank project records. "
+                            "Processing may take 30–90 seconds. Please do not close the window.",
                         ],
                         style={**_ALERT_INFO, "marginTop": "0", "marginBottom": "16px"},
                     ),
@@ -600,7 +600,7 @@ def _keywords_delete_hierarchy() -> html.Div:
                         clearable=True,
                         style={
                             "backgroundColor": "#252525",
-                            "color":           _TEXT_PRI,
+                            "color":           _TEXT_DELETE,
                             "border":          f"1px solid {_BORDER}",
                             "borderRadius":    "6px",
                             "marginBottom":    "20px",
