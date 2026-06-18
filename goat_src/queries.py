@@ -290,6 +290,7 @@ QUERY_HIERARCHY_TABLE = (
     f"FROM {HIERARCHY_TABLE}\n"
     f"WHERE {COL_HIER_FULLNAME} IS NOT NULL\n"
     f"  AND {COL_HIER_KEYWORD}  IS NOT NULL\n"
+    f"  AND {COL_VALID_HIER}    = 'True'\n"   # ← ADD THIS LINE
     f"ORDER BY {COL_HIER_FULLNAME}, {COL_HIER_KEYWORD} ASC"
 )
 
@@ -325,6 +326,38 @@ def build_delete_hierarchy_query(hierarchy_name: str) -> str:
         f"WHERE  {COL_HIERARCHY}  = '{safe}'"
     )
 
+def build_insert_hierarchy_table_query(rows: list[dict]) -> str:
+    """
+    INSERT rows into the HIERARCHY_TABLE (0c_hierarchy_table_goat).
+    Each dict must have keys: hierarchy, fullname, keyword_catagory, keyword, Valid_Hierarchy
+    """
+    if not rows:
+        raise ValueError("No rows to insert into hierarchy table.")
+    col_list = f"{COL_HIER_SHORT}, {COL_HIER_FULLNAME}, {COL_HIER_CATEGORY}, {COL_HIER_KEYWORD}, {COL_VALID_HIER}"
+    values_parts = []
+    for r in rows:
+        def esc(v): return "NULL" if v is None else f"'{str(v).replace(chr(39), chr(39)*2)}'"
+        values_parts.append(
+            f"({esc(r['hierarchy'])}, {esc(r['fullname'])}, "
+            f"{esc(r['keyword_catagory'])}, {esc(r['keyword'])}, {esc(r['Valid_Hierarchy'])})"
+        )
+    return (
+        f"INSERT INTO {HIERARCHY_TABLE} ({col_list})\n"
+        f"VALUES {', '.join(values_parts)}"
+    )
+
+
+def build_delete_hierarchy_table_query(hierarchy_short: str) -> str:
+    """
+    Soft-delete in HIERARCHY_TABLE: set Valid_Hierarchy = 'False'
+    for all rows matching the hierarchy short code.
+    """
+    safe = hierarchy_short.replace("'", "''")
+    return (
+        f"UPDATE {HIERARCHY_TABLE}\n"
+        f"SET    {COL_VALID_HIER} = 'False'\n"
+        f"WHERE  {COL_HIER_SHORT} = '{safe}'"
+    )
 
 def build_insert_hierarchy_query(df_name: str = "new_hierarchy_df") -> str:
     """
@@ -664,9 +697,24 @@ class QueryService:
             # ── 5. Insert into UC table ────────────────────────────────────────
             self._insert_dataframe(result_df)
 
+            # ── 6. Insert keyword rows into HIERARCHY_TABLE ────────────────────────
+            hier_rows = [
+                {
+                    "hierarchy":       hierarchy_name,
+                    "fullname":        full_name,
+                    "keyword_catagory": "",          # no category supplied at add-time; extend UI if needed
+                    "keyword":         kw,
+                    "Valid_Hierarchy": "True",
+                }
+                for kw in keywords_raw
+            ]
+            hier_insert_sql = build_insert_hierarchy_table_query(hier_rows)
+            self.execute_write(hier_insert_sql)
+
             return True, (
                 f"Hierarchy '{hierarchy_name}' added successfully. "
-                f"{matched:,} of {total:,} projects matched the keywords."
+                f"{matched:,} of {total:,} projects matched the keywords. "
+                f"{len(keywords_raw)} keyword(s) written to the hierarchy table."
             )
 
         except Exception as exc:
@@ -683,9 +731,16 @@ class QueryService:
         if not hierarchy_name:
             return False, "No hierarchy selected."
         try:
+            # Soft-delete in GOAT_TABLE
             query = build_delete_hierarchy_query(hierarchy_name)
-            logger.info("[GoAT] delete_hierarchy: %s", hierarchy_name)
+            logger.info("[GoAT] delete_hierarchy (goat table): %s", hierarchy_name)
             self.execute_write(query)
+
+            # Soft-delete in HIERARCHY_TABLE  ← NEW
+            hier_query = build_delete_hierarchy_table_query(hierarchy_name)
+            logger.info("[GoAT] delete_hierarchy (hierarchy table): %s", hierarchy_name)
+            self.execute_write(hier_query)
+
             return True, f"Hierarchy '{hierarchy_name}' has been deactivated."
         except Exception as exc:
             logger.exception("[GoAT] delete_hierarchy failed: %s", exc)
