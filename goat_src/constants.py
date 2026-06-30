@@ -34,6 +34,7 @@ COL_HIERARCHY      = "hierarchy_name"
 COL_IS_HIER        = "Ishierarchy_present"
 COL_IS_HIER_YES    = "Yes"
 COL_VALID_HIER     = "Valid_Hierarchy"          # "True" / "False" (string)
+COL_COUNTRY        = "CNTRY_SHORT_NAME"
 
 # ── Keyword-searchable text columns (in 0b_overall_goat_df) ───────────────────
 # Order matters: checked left-to-right; all five must exist in the table.
@@ -54,6 +55,7 @@ COL_HIER_KEYWORD   = "keyword"            # individual keyword
 DOWNLOAD_COLUMNS: list[str] = [
     COL_PROJ_ID,
     COL_PROJ_NAME,
+    COL_COUNTRY,
     COL_APPRVL_FY,
     COL_PROJ_STAT,
     COL_LEND_INSTR,
