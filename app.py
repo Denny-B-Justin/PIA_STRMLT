@@ -392,6 +392,11 @@ def _dashboard_content() -> html.Div:
                                                 "displayModeBar": True,
                                                 "displaylogo":    False,
                                                 "modeBarButtonsToRemove": ["select2d", "lasso2d"],
+                                                "toImageButtonOptions": {
+                                                    "format": "svg",  # Bypasses the blocked 'blob:' format
+                                                    "filename": "project_status_chart",
+                                                    "scale": 1
+                                                }
                                             },
                                             style={"height": "460px"},
                                         )
@@ -409,6 +414,11 @@ def _dashboard_content() -> html.Div:
                                                 "displayModeBar": True,
                                                 "displaylogo":    False,
                                                 "modeBarButtonsToRemove": ["select2d", "lasso2d"],
+                                                "toImageButtonOptions": {
+                                                    "format": "svg",  # Bypasses the blocked 'blob:' format
+                                                    "filename": "lending_instrument_chart",
+                                                    "scale": 1
+                                                }
                                             },
                                             style={"height": "460px"},
                                         )
@@ -461,6 +471,11 @@ def _keywords_available_hierarchies() -> html.Div:
                     config={
                         "displayModeBar": False,
                         "displaylogo":    False,
+                        "toImageButtonOptions": {
+                            "format": "svg",  # Bypasses the blocked 'blob:' format
+                            "filename": "hierarchy_chart",
+                            "scale": 1
+                        }
                     },
                     style={"height": "600px"},
                     figure=build_empty_chart("Loading hierarchy data…"),
