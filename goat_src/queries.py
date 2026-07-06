@@ -628,7 +628,7 @@ class QueryService:
 
         1. Fetch all project text rows from the UC table (cached).
         2. Run vectorised keyword search → boolean mask per project.
-        3. Build a DataFrame that mirrors 0b_overall_goat_df's required columns
+        3. Build a DataFrame that mirrors 1b_overall_goat_df's required columns
            with one row per project, hierarchy_name = hierarchy_name,
            Ishierarchy_present = 'Yes'/'No', Valid_Hierarchy = 'True'.
         4. Write the new rows to the table via INSERT INTO … SELECT.
@@ -662,7 +662,7 @@ class QueryService:
             text_df[COL_VALID_HIER] = "True"
 
             # ── 4. Fetch full project rows for matched & unmatched projects ────
-            # We need all columns of 0b_overall_goat_df, not just the text cols.
+            # We need all columns of 1b_overall_goat_df, not just the text cols.
             # Strategy: pull the full table once (cached), then left-join the
             # Ishierarchy_present result from the search.
             full_df = self._get_full_goat_df_deduplicated()

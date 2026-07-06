@@ -63,7 +63,7 @@ python app.py          # open http://localhost:8050
 
 **Keywords** — Three sub-tabs:
 - *Available Hierarchies* — sunburst chart of all active hierarchies and their keywords, sourced directly from `0c_hierarchy_table_goat`.
-- *Add New Keywords* — enter a hierarchy name, full name, and comma-separated keywords. GoAT runs a vectorised keyword search across ~10,000 projects (across `Indicators`, `PriorActions`, `PROJ_DEV_OBJECTIVE_DESC`, `Components`) and inserts one row per project into `0b_overall_goat_df` with `Ishierarchy_present = Yes/No` and `Valid_Hierarchy = True`.
+- *Add New Keywords* — enter a hierarchy name, full name, and comma-separated keywords. GoAT runs a vectorised keyword search across ~10,000 projects (across `Indicators`, `PriorActions`, `PROJ_DEV_OBJECTIVE_DESC`, `Components`) and inserts one row per project into `1b_overall_goat_df` with `Ishierarchy_present = Yes/No` and `Valid_Hierarchy = True`.
 - *Delete Hierarchy* — soft-deletes a hierarchy by setting `Valid_Hierarchy = False` on all matching rows. No data is permanently removed; all dashboard queries filter on `Valid_Hierarchy = True`.
 
 **About** — Tool background and CoP context.
