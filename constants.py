@@ -409,6 +409,69 @@ COUNTRY_CONFIGS: dict = {
         "country_results_template":      "lgu_accessibility_results_uzb_{suffix}",
         "province_results_template":     "lgu_accessibility_results_uzb_{slug}_province_{suffix}",
     },
+
+    "pakistan": {
+        # ── Display ───────────────────────────────────────────────────────────
+        "display_name":     "Pakistan",
+        "iso3":             "pak",
+
+        # ── Map defaults ──────────────────────────────────────────────────────
+        # Pakistan spans roughly 23.6°N–37.0°N, 60.8°E–77.0°E
+        "center_lat":       30.37,
+        "center_lon":       69.30,
+        "map_zoom":         5.0,
+        "province_zoom":    6.0,
+
+        # ── Population (2025 World Bank estimate) ─────────────────────────────
+        "population":       23_199_335,
+
+        # ── Databricks catalog / schema ───────────────────────────────────────
+        # Set PAKISTAN_CATALOG, PAKISTAN_FACILITIES_SCHEMA, PAKISTAN_RESULTS_SCHEMA
+        # as env vars on Posit Connect before enabling this country.
+        "catalog_env":               "PAKISTAN_CATALOG",
+        "catalog_default":           "prd_mega",
+        "facilities_schema_env":     "PAKISTAN_FACILITIES_SCHEMA",
+        "facilities_schema_default": "sgpbpi163",
+        "results_schema_env":        "PAKISTAN_RESULTS_SCHEMA",
+        "results_schema_default":    "sgpbpi163",
+
+        # ── Sub-national administrative units ─────────────────────────────────
+        # Pakistan has 4 provinces; each contains districts.  Using regions as the
+        # top-level granularity here; extend to districts when pipeline is ready.
+        "subnational_label": "Province",
+        "subnational_units": [
+            'Balochistan', 'Federal Capital Territory', 'Khyber Pakhtunkhwa', 
+            'Punjab', 'Sindh',
+        ],
+        "subnational_slugs": {
+            "Balochistan": "balochistan",
+            "Federal Capital Territory": "federal_capital_territory",
+            "Khyber Pakhtunkhwa": "khyber_pakhtunkhwa",
+            "Punjab": "punjab",
+            "Sindh": "sindh",
+        },
+
+        # ── Distance bands (same convention as Zambia) ────────────────────────
+        "distance_km_map": {5: 5, 10: 10, "30min": 2, "1hr": 4},
+
+        # ── Hardcoded baseline fallbacks ──────────────────────────────────────
+        # Update once Malawi baseline data is available in Databricks.
+        "fallback_baselines": {
+            5:       61.35,
+            10:      83.68,
+            "30min": 42.63,
+            "1hr":   55.46,
+        },
+
+        # ── Table naming conventions (mirror Zambia; zmb → mwi) ───────────────
+        "db_country_name":               "Pakistan",
+        "base_table":                    "base_dashboard_data_pak",
+        "country_facilities_table":      "health_facilities_pak_osm",
+        "province_facilities_template":  "health_facilities_pak_osm_{slug}_province",
+        "results_suffix_map": {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"},
+        "country_results_template":      "lgu_accessibility_results_pak_{suffix}",
+        "province_results_template":     "lgu_accessibility_results_pak_{slug}_province_{suffix}",
+    },
 }
     
 
