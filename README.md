@@ -1,77 +1,65 @@
-# GoAT — Governance Operations Analytics Tool
+# PFM4CA Country Benchmarking Tool — Dash Edition
 
-GoAT allows targeted searches across core fields of the World Bank's three operation types — **Development Policy Operations (DPO)**, **Investment Project Financing (IPF)**, and **Program-for-Results (PfoR)**. Clusters of keywords are mapped to thematic hierarchies such as Public Investment Management (PIM), Public Asset Management (PAM), and State-Owned Enterprises (SOEs), enabling users to analyse operational trends, filter projects by region and lending instrument, and manage keyword sets — all in real time against a live Unity Catalog data source.
+A pure Python/Dash port of the original React + FastAPI app. No database, no
+API server — every page reads straight from the CSV files in `./data`.
 
-The tool is operated by the World Bank's Global Community of Practice for **Public Infrastructure Investments and Asset Governance (PIIAG)** (P179442) and is deployed for official/internal access only where data is not available via public APIs.
-
----
-### World Bank Data Analytics Deployment: https://datanalytics.worldbank.org/content/5e009cdd-7b07-4567-8f45-eb3a3f476abc/
----
-
-## Architecture
+## Project layout
 
 ```
-Browser
-  │
-  ▼
-Dash App (app.py)
-  ├── Layout & Callbacks
-  ├── Chart Builders       utils.py
-  ├── SQL + Write Layer    queries.py
-  └── Config               constants.py
-        │
-        ▼
-  Azure Databricks SQL Warehouse
-  (OAuth2 M2M — Service Principal)
-        │
-        ├── Master Projects Table       ← project × hierarchy rows (main data)
-        └── Hierarchy Table  ← keyword reference table
+app.py            Dash app: routing, page layouts, all callbacks
+queries.py         All data access: loads CSVs from ./data, computes map scores,
+                    popup rows, EF (DEA/FDH) frontier, etc.
+utils.py           Presentation helpers: colors, Mapbox figure builder, header/
+                    sidebar/legend/popup builders, styled dropdown
+data/              CSVs (score/desc tables, country lookup, PEFA master, EF
+                    indicators) + world_countries.geojson (ISO A3-coded
+                    country boundaries used for every choropleth)
+assets/            style.css (auto-loaded by Dash) + logo + favicon
 ```
-
-All queries are built dynamically from filter state. Results are served from an in-process TTL cache (default 5 min) before hitting the warehouse.
-
----
-
-## Project Structure
-
-| File | Role |
-|------|------|
-| `app.py` | Dash layout, all callbacks, WSGI export |
-| `queries.py` | `QueryService` singleton — SQL builders, Databricks auth, TTL cache, keyword search engine, write operations |
-| `utils.py` | Plotly figure builders (bar charts + sunburst) |
-| `constants.py` | Table names, column identifiers, colours, layout defaults |
-| `assets/goat.css` | Dark theme, red multi-value dropdown pills |
-| `.env` | Databricks credentials (never committed) |
-
----
 
 ## Setup
 
 ```bash
 pip install -r requirements.txt
-cp .env.example .env   # fill in the four Databricks values
-python app.py          # open http://localhost:8050
 ```
 
-**Required env vars** — `DATABRICKS_SERVER_HOSTNAME`, `DATABRICKS_HTTP_PATH`, `DATABRICKS_CLIENT_ID`, `DATABRICKS_CLIENT_SECRET`. Find the first two under *SQL Warehouses → Connection details* in your Databricks workspace; the latter two come from your Azure service principal.
+## Mapbox
 
----
+The maps use Plotly's `Choroplethmapbox` trace. To get the exact
+`mapbox://styles/mapbox/light-v11` look from the original app, set a Mapbox
+access token before running:
 
-## Tabs
+```bash
+export MAPBOX_TOKEN=pk.your_token_here   # macOS/Linux
+set MAPBOX_TOKEN=pk.your_token_here      # Windows (cmd)
+```
 
-**Dashboard** — Filter by Lending Instrument, Region, and Keyword Hierarchy (AND/OR logic). Renders a live project count metric, two stacked bar charts (Project Status and Lending Instrument by approval FY), and a downloadable project table.
+Without a token the app still runs fine — maps fall back to the free
+"carto-positron" basemap style automatically.
 
-**Keywords** — Three sub-tabs:
-- *Available Hierarchies* — sunburst chart of all active hierarchies and their keywords, sourced directly from `0c_hierarchy_table_goat`.
-- *Add New Keywords* — enter a hierarchy name, full name, and comma-separated keywords. GoAT runs a vectorised keyword search across ~10,000 projects (across `Indicators`, `PriorActions`, `PROJ_DEV_OBJECTIVE_DESC`, `Components`) and inserts one row per project into `1b_overall_goat_df` with `Ishierarchy_present = Yes/No` and `Valid_Hierarchy = True`.
-- *Delete Hierarchy* — soft-deletes a hierarchy by setting `Valid_Hierarchy = False` on all matching rows. No data is permanently removed; all dashboard queries filter on `Valid_Hierarchy = True`.
+## Run
 
-**About** — Tool background and CoP context.
+```bash
+python app.py
+```
 
----
+Then open http://127.0.0.1:8050
 
-## Keyword Search Design
+## Notes on the port
 
-The search uses vectorised pandas string matching — a `.str.contains()` call per text column, case-insensitive, applied across all project rows in a single DataFrame operation.
-
-For production deployments on Posit Connect, set the four env vars under *Content Settings → Vars* and ensure the service principal has `CAN USE` on the SQL warehouse and `SELECT` / `MODIFY` on both UC tables.
+- **Region/pillar dropdowns** are `dcc.Dropdown` (Dash's raw `html.Select`
+  has no bindable `value` prop), themed via CSS in `assets/style.css` to
+  match the original's compact native-select look.
+- **Choropleth colors** are computed the same way as the original
+  `getScoreColor5` / categorical logic in `constants.ts`: continuous scores
+  are bucketed into 5 bands (Low → High); PIMS and PEFA use their own fixed
+  categorical color sets. Countries with no data render at low opacity gray.
+- **Click-to-see-detail** replaces the original's map-anchored Mapbox popup
+  with a floating panel pinned to the top-right of the map (same table
+  layout: Country / Indicator / Score). Hover tooltips use Plotly's native
+  hover label.
+- **PEFA's region dropdown** only re-centers the map (as in the original) —
+  it does not filter the data, since PEFA scores aren't tied to World Bank
+  regions in the source data.
+- The world boundary file is Natural Earth data (public domain), simplified
+  and reduced to ISO A3 + name only to keep the app fast.
