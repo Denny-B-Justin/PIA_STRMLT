@@ -2,4 +2,3 @@ streamvenv
 .env
 __pycache__/
 node_modules/
-assets/world_bank_boundries.geojson
