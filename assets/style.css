@@ -200,6 +200,17 @@ button { font-family: inherit; cursor: pointer; }
   margin: 0;
 }
 
+.info-list {
+  margin: 0;
+  padding-left: 1.1em;
+}
+.info-list-item {
+  font-size: 12px;
+  line-height: 1.625;
+  margin-bottom: 4px;
+  color: var(--text-muted);
+}
+
 /* ── Styled select (dcc.Dropdown themed to look like the original native
        <select>: white bg, gray border, 38px tall, small bold text) ────────── */
 
