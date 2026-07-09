@@ -18,6 +18,7 @@ import os
 import json
 import logging
 from functools import lru_cache
+from typing import Optional
 
 import numpy as np
 import pandas as pd
@@ -206,7 +207,7 @@ def region_query(region: str) -> pd.DataFrame:
 # component: they take the raw long-format score tables and turn them into
 # one row per country with a map score, a hover tooltip, and the detailed
 # rows to show in the click-popup. Every builder returns a list of dicts:
-#   {"cntrCode": str, "score": float | None, "tooltip": str, "popupRows": [...]}
+#   {"cntrCode": str, "score": Optional[float], "tooltip": str, "popupRows": [...]}
 
 def _nan_to_none(v):
     if v is None:
@@ -663,7 +664,7 @@ def ef_get_frontier() -> dict:
     }
 
 
-def ef_get_scores(method: str | None = None, sample: str | None = None, isos: list | None = None) -> pd.DataFrame:
+def ef_get_scores(method: Optional[str] = None, sample: Optional[str] = None, isos: Optional[list[str]] = None) -> pd.DataFrame:
     """Per-country, per-indicator efficiency score rows (excludes the raw input/output vars)."""
     df = _load_ef_raw().copy()
     exclude = {EF_INPUT_VAR, EF_OUTPUT_VAR}
