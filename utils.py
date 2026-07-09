@@ -68,15 +68,27 @@ NO_DATA_COLOR = "#cccccc"
 COUNTRY_COLORS = ["#4345aa", "#64cbd6", "#f26b23", "#37b37f", "#3675b7"]
 
 PAGE_TITLES = {
-    "/": "Overview",
-    "/gccii": "GCCII",
-    "/gtmi": "GTMI",
-    "/ef": "Infrastructure Efficiency",
-    "/ccia": "CCIA",
-    "/infra": "Infrastructure",
-    "/piiag": "PIIAG",
-    "/pefa": "PEFA",
+    "": "Overview",
+    "gccii": "GCCII",
+    "gtmi": "GTMI",
+    "ef": "Infrastructure Efficiency",
+    "ccia": "CCIA",
+    "infra": "Infrastructure",
+    "piiag": "PIIAG",
+    "pefa": "PEFA",
 }
+
+
+def page_href(page_key):
+    """
+    Build an internal link href for a given page key using query-string
+    routing (?page=xxx) instead of distinct paths. This is deliberately
+    prefix-agnostic: when the app is deployed behind Posit Connect (which
+    mounts content under its own path, e.g. /content/<guid>/), a relative
+    "/?page=gtmi" style link still resolves correctly without needing to
+    know or replicate Connect's path prefix.
+    """
+    return f"/?page={page_key}" if page_key else "/"
 
 
 def get_mapbox_token() -> str:
@@ -285,78 +297,86 @@ NAV_SECTIONS = [
     {
         "label": "Global Datasets",
         "links": [
-            {"label": "Climate Change Institutional Indicators", "href": "/gccii"},
-            {"label": "GovTech Maturity Index", "href": "/gtmi"},
-            {"label": "Infra Efficiency", "href": "/ef"},
-            {"label": "PEFA PI-11/12/16", "href": "/pefa"},
+            {"label": "Climate Change Institutional Indicators", "page": "gccii"},
+            {"label": "GovTech Maturity Index", "page": "gtmi"},
+            {"label": "Infra Efficiency", "page": "ef"},
+            {"label": "PEFA PI-11/12/16", "page": "pefa"},
         ],
     },
     {
         "label": "Local Datasets",
         "links": [
-            {"label": "CCIA", "href": "/ccia"},
-            {"label": "Infrastructure", "href": "/infra"},
-            {"label": "PIIAG", "href": "/piiag"},
+            {"label": "CCIA", "page": "ccia"},
+            {"label": "Infrastructure", "page": "infra"},
+            {"label": "PIIAG", "page": "piiag"},
         ],
     },
 ]
 
 
-def build_header(pathname="/"):
+def build_header(current_page="", logo_src=None):
+    """
+    current_page: the page key parsed from ?page=... (empty string = home).
+    logo_src: the resolved asset URL for the header logo. This is computed
+    in app.py (via app.get_asset_url(...), where the `app` object actually
+    lives) and passed in here - utils.py has no Dash app instance of its
+    own, so it must never call app.get_asset_url() directly.
+    """
+    logo_children = html.Img(src=logo_src, className="header-logo") if logo_src else html.Div(className="header-logo")
     return html.Header(
         className="app-header",
         children=[
             dcc.Link(
-                html.Img(src="/assets/cbd_logo_white.png", className="header-logo"),
+                logo_children,
                 href="/",
                 className="header-logo-link",
             ),
-            html.Div(className="header-divider"),
+            # html.Div(className="header-divider"),
             html.Nav(
                 className="header-nav",
-                children=[
-                    dcc.Link(
-                        "Home",
-                        href="/",
-                        className="header-nav-link" + (" active" if pathname == "/" else ""),
-                    ),
-                    html.A(
-                        "Release Notes",
-                        href="https://pim-pam.net/cbd-release-notes/",
-                        target="_blank",
-                        rel="noopener noreferrer",
-                        className="header-nav-link",
-                    ),
-                ],
+                # children=[
+                #     dcc.Link(
+                #         "Home",
+                #         href="/",
+                #         className="header-nav-link" + (" active" if current_page == "" else ""),
+                #     ),
+                #     html.A(
+                #         "Release Notes",
+                #         href="https://pim-pam.net/cbd-release-notes/",
+                #         target="_blank",
+                #         rel="noopener noreferrer",
+                #         className="header-nav-link",
+                #     ),
+                # ],
             ),
-            html.Div(
-                className="header-brand",
-                children=[
-                    html.P("Part of", className="header-brand-sub"),
-                    html.A(
-                        "PIM-PAM.net",
-                        href="https://pim-pam.net",
-                        target="_blank",
-                        rel="noopener noreferrer",
-                        className="header-brand-link",
-                    ),
-                ],
-            ),
+            # html.Div(
+            #     className="header-brand",
+            #     children=[
+            #         html.P("Part of", className="header-brand-sub"),
+            #         html.A(
+            #             "PIM-PAM.net",
+            #             href="https://pim-pam.net",
+            #             target="_blank",
+            #             rel="noopener noreferrer",
+            #             className="header-brand-link",
+            #         ),
+            #     ],
+            # ),
         ],
     )
 
 
-def build_home_nav_sidebar(pathname="/"):
+def build_home_nav_sidebar(current_page=""):
     """The Introduction page's sidebar: two cards of dataset links."""
     sections = []
     for section in NAV_SECTIONS:
         links = []
         for link in section["links"]:
-            is_active = pathname == link["href"]
+            is_active = current_page == link["page"]
             links.append(
                 dcc.Link(
                     link["label"],
-                    href=link["href"],
+                    href=page_href(link["page"]),
                     className="nav-link" + (" active" if is_active else ""),
                 )
             )
