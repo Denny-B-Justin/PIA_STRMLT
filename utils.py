@@ -354,19 +354,19 @@ def build_header(current_page="", logo_src=None):
                 #     ),
                 # ],
             ),
-            html.Div(
-                className="header-brand",
-                children=[
-                    html.P("Part of", className="header-brand-sub"),
-                    html.A(
-                        ".net",
-                        href="https://pim-pam.net",
-                        target="_blank",
-                        rel="noopener noreferrer",
-                        className="header-brand-link",
-                    ),
-                ],
-            ),
+            # html.Div(
+            #     className="header-brand",
+            #     children=[
+            #         html.P("Part of", className="header-brand-sub"),
+            #         html.A(
+            #             ".net",
+            #             href="https://pim-pam.net",
+            #             target="_blank",
+            #             rel="noopener noreferrer",
+            #             className="header-brand-link",
+            #         ),
+            #     ],
+            # ),
         ],
     )
 
