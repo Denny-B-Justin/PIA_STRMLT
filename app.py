@@ -13,6 +13,7 @@ Without a token, maps still render using the open "carto-positron" style.
 
 import json
 import warnings
+from urllib.parse import parse_qs
 
 import dash
 from dash import Dash, dcc, html, Input, Output, State, ALL, ctx
@@ -25,6 +26,19 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 app = Dash(__name__, suppress_callback_exceptions=True, title=u.BASE_TITLE)
 server = app.server
+
+# ══════════════════════════════════════════════════════════════════════════
+# Asset URLs
+# ══════════════════════════════════════════════════════════════════════════
+# app.get_asset_url(...) must be called here, where `app` actually exists -
+# utils.py has no Dash app instance and must never call it directly (that
+# was the cause of the header's NameError). Resolve every image up front and
+# hand the resulting URLs down into the layout builders.
+
+LOGO_WHITE_URL = app.get_asset_url("cbd_logo_white.png")
+# Placeholder - swap in the real filename once the hero image is added to
+# /assets. Used by introduction_layout() below for the front-page banner.
+HERO_BANNER_URL = app.get_asset_url("cbd_hero_banner.png")
 
 # ══════════════════════════════════════════════════════════════════════════
 # Static content
@@ -90,7 +104,7 @@ EF_CUSTOM_ORDER = q.EF_SHORT_NAME_ORDER
 # Layouts
 # ══════════════════════════════════════════════════════════════════════════
 
-def introduction_layout(pathname):
+def introduction_layout(current_page):
     rows = []
     for b in BENCHMARKS:
         rows.append(
@@ -117,6 +131,7 @@ def introduction_layout(pathname):
         children=html.Div(
             className="intro-content",
             children=[
+                # html.Img(className="intro-hero-banner", alt="PFM4CA Country Benchmarking Tool"),
                 html.H1("PFM4CA Country Benchmarking Tool", className="intro-title"),
                 html.P(
                     "The Country Benchmarking Tool (CBT) helps visualize PFM4CA performance across a "
@@ -135,13 +150,13 @@ def introduction_layout(pathname):
     return html.Div(
         className="page-shell",
         children=[
-            u.build_header(pathname),
-            html.Div(className="body-shell", children=[u.build_home_nav_sidebar(pathname), main]),
+            u.build_header(current_page, LOGO_WHITE_URL),
+            html.Div(className="body-shell", children=[u.build_home_nav_sidebar(current_page), main]),
         ],
     )
 
 
-def _map_page_shell(pathname, sidebar_children, map_id, legend_id, popup_id):
+def _map_page_shell(current_page, sidebar_children, map_id, legend_id, popup_id):
     main = html.Main(
         className="map-main",
         children=html.Div(
@@ -167,7 +182,7 @@ def _map_page_shell(pathname, sidebar_children, map_id, legend_id, popup_id):
     return html.Div(
         className="page-shell",
         children=[
-            u.build_header(pathname),
+            u.build_header(current_page, LOGO_WHITE_URL),
             html.Div(
                 className="body-shell",
                 children=[u.build_sub_nav_sidebar(sidebar_children), main],
@@ -176,7 +191,7 @@ def _map_page_shell(pathname, sidebar_children, map_id, legend_id, popup_id):
     )
 
 
-def gccii_layout(pathname):
+def gccii_layout(current_page):
     sidebar = [
         u.form_field("Region", u.styled_select("gccii-region", u.GLOBAL_REGIONS, u.GLOBAL_REGIONS[0])),
         u.info_blocks_section([
@@ -190,10 +205,10 @@ def gccii_layout(pathname):
                       "present (1). The summary is the average of these scores."),
         ]),
     ]
-    return _map_page_shell(pathname, sidebar, "gccii-map", "gccii-legend", "gccii-popup")
+    return _map_page_shell(current_page, sidebar, "gccii-map", "gccii-legend", "gccii-popup")
 
 
-def gtmi_layout(pathname):
+def gtmi_layout(current_page):
     sidebar = [
         u.form_field("Region", u.styled_select("gtmi-region", u.GLOBAL_REGIONS, u.GLOBAL_REGIONS[0])),
         u.form_field("Main Pillar", u.styled_select("gtmi-pillar", q.GTMI_PILLARS, "PIMS")),
@@ -206,10 +221,10 @@ def gtmi_layout(pathname):
                         "country to see the detailed indicators"),
         ]),
     ]
-    return _map_page_shell(pathname, sidebar, "gtmi-map", "gtmi-legend", "gtmi-popup")
+    return _map_page_shell(current_page, sidebar, "gtmi-map", "gtmi-legend", "gtmi-popup")
 
 
-def ccia_layout(pathname):
+def ccia_layout(current_page):
     pillars = ["Overall"] + q.ccia_pillars()
     sidebar = [
         u.form_field("Country Management Unit", u.styled_select("ccia-region", u.LOCAL_REGIONS, u.LOCAL_REGIONS[0])),
@@ -225,10 +240,10 @@ def ccia_layout(pathname):
                       "average of these scores."),
         ]),
     ]
-    return _map_page_shell(pathname, sidebar, "ccia-map", "ccia-legend", "ccia-popup")
+    return _map_page_shell(current_page, sidebar, "ccia-map", "ccia-legend", "ccia-popup")
 
 
-def infra_layout(pathname):
+def infra_layout(current_page):
     sidebar = [
         u.form_field("Region", u.styled_select("infra-region", u.GLOBAL_REGIONS, u.GLOBAL_REGIONS[0])),
         u.info_blocks_section([
@@ -240,10 +255,10 @@ def infra_layout(pathname):
                       "are exempted from the calculation and shown in gray."),
         ]),
     ]
-    return _map_page_shell(pathname, sidebar, "infra-map", "infra-legend", "infra-popup")
+    return _map_page_shell(current_page, sidebar, "infra-map", "infra-legend", "infra-popup")
 
 
-def piiag_layout(pathname):
+def piiag_layout(current_page):
     sections = ["Overall"] + q.piiag_sections()
     sidebar = [
         u.form_field("Country Management Unit", u.styled_select("piiag-region", u.LOCAL_REGIONS, u.LOCAL_REGIONS[0])),
@@ -256,10 +271,10 @@ def piiag_layout(pathname):
                       "present (1). The summary is the average of these scores."),
         ]),
     ]
-    return _map_page_shell(pathname, sidebar, "piiag-map", "piiag-legend", "piiag-popup")
+    return _map_page_shell(current_page, sidebar, "piiag-map", "piiag-legend", "piiag-popup")
 
 
-def pefa_layout(pathname):
+def pefa_layout(current_page):
     sidebar = [
         u.form_field("Region", u.styled_select("pefa-region", u.GLOBAL_REGIONS, u.GLOBAL_REGIONS[0])),
         u.form_field("Indicator", u.styled_select("pefa-indicator", q.PEFA_INDICATORS, q.PEFA_INDICATORS[0])),
@@ -278,10 +293,10 @@ def pefa_layout(pathname):
                         "that assessment."),
         ]),
     ]
-    return _map_page_shell(pathname, sidebar, "pefa-map", "pefa-legend", "pefa-popup")
+    return _map_page_shell(current_page, sidebar, "pefa-map", "pefa-legend", "pefa-popup")
 
 
-def ef_layout(pathname):
+def ef_layout(current_page):
     filters = q.ef_get_filters()
     methods = filters["methods"]
     samples = filters["samples"]
@@ -340,17 +355,17 @@ def ef_layout(pathname):
     return html.Div(
         className="page-shell",
         children=[
-            u.build_header(pathname),
+            u.build_header(current_page, LOGO_WHITE_URL),
             html.Div(className="body-shell", children=[u.build_sub_nav_sidebar(sidebar), main]),
         ],
     )
 
 
-def not_found_layout(pathname):
+def not_found_layout(current_page):
     return html.Div(
         className="page-shell",
         children=[
-            u.build_header(pathname),
+            u.build_header(current_page, LOGO_WHITE_URL),
             html.Div(
                 className="body-shell",
                 children=html.Main(
@@ -370,19 +385,27 @@ def not_found_layout(pathname):
 
 
 PAGE_BUILDERS = {
-    "/": introduction_layout,
-    "/gccii": gccii_layout,
-    "/gtmi": gtmi_layout,
-    "/ef": ef_layout,
-    "/ccia": ccia_layout,
-    "/infra": infra_layout,
-    "/piiag": piiag_layout,
-    "/pefa": pefa_layout,
+    "": introduction_layout,
+    "gccii": gccii_layout,
+    "gtmi": gtmi_layout,
+    "ef": ef_layout,
+    "ccia": ccia_layout,
+    "infra": infra_layout,
+    "piiag": piiag_layout,
+    "pefa": pefa_layout,
 }
 
 # ══════════════════════════════════════════════════════════════════════════
 # App shell / routing
 # ══════════════════════════════════════════════════════════════════════════
+# Routing is driven by the ?page=xxx query string rather than distinct
+# paths (e.g. /gtmi). This is deliberate: Posit Connect deploys each app
+# under its own path prefix (e.g. /content/<guid>/), and dcc.Location's
+# "pathname" reflects that full real-world URL, so exact-string path
+# matching like PAGE_BUILDERS.get("/gtmi") silently breaks in production
+# (every route - including "/" - falls through to the 404 page). A query
+# string tacked onto whatever the real base path happens to be keeps
+# working regardless of where Connect mounts the app.
 
 app.layout = html.Div([
     dcc.Location(id="url", refresh=False),
@@ -390,24 +413,35 @@ app.layout = html.Div([
 ])
 
 
-@app.callback(Output("page-content", "children"), Input("url", "pathname"))
-def render_page(pathname):
-    builder = PAGE_BUILDERS.get(pathname, not_found_layout)
-    return builder(pathname)
+def _get_page_key(search):
+    """search: dcc.Location's raw query string, e.g. '?page=gtmi' or ''."""
+    if not search:
+        return ""
+    qs = parse_qs(search.lstrip("?"))
+    return qs.get("page", [""])[0]
+
+
+@app.callback(Output("page-content", "children"), Input("url", "search"))
+def render_page(search):
+    current_page = _get_page_key(search)
+    builder = PAGE_BUILDERS.get(current_page, not_found_layout)
+    return builder(current_page)
 
 
 app.clientside_callback(
     """
-    function(pathname) {
+    function(search) {
         const titles = """ + json.dumps(u.PAGE_TITLES) + """;
         const base = """ + json.dumps(u.BASE_TITLE) + """;
-        const subtitle = titles[pathname];
+        const params = new URLSearchParams(search || "");
+        const page = params.get("page") || "";
+        const subtitle = titles[page];
         document.title = subtitle ? (base + " - " + subtitle) : base;
         return "";
     }
     """,
     Output("page-content", "title"),
-    Input("url", "pathname"),
+    Input("url", "search"),
 )
 
 
@@ -781,4 +815,3 @@ def _update_bar_block(selected, method, sample):
 
 if __name__ == "__main__":
     app.run(debug=False, host="127.0.0.1", port=8050)
-    
