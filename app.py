@@ -1,1351 +1,779 @@
 """
-GoAT — Governance Operations Analytics Tool
-Dash application entry point.
+app.py
+------
+PFM4CA Country Benchmarking Tool - Dash port.
 
-Architecture
-------------
-  constants.py  ← app config, column names, chart defaults
-  queries.py    ← QueryService (Databricks auth + TTL cache + SQL builders)
-  utils.py      ← Plotly figure constructors
-  app.py        ← Dash layout + callbacks (this file)
+Run with:  python app.py
+Then open  http://127.0.0.1:8050
 
-Callback flow — Dashboard
---------------------------
-  1. init_filter_options   — page load → populate Lending Instrument + Keywords dropdowns
-  2. cascade_regions       — Lending Instrument change → update Region options
-  3. apply_filters         — "Apply Filters" click → fetch all chart / table data
-  4. render_download_table — store-download change → populate DataTable + tooltips
-  5. export_csv            — "Export CSV" click → send CSV via dcc.Download
-
-Callback flow — Keywords tab
-------------------------------
-  6. init_keywords_tab     — Keywords tab activated → load sunburst + delete dropdown
-  7. add_keyword           — "Add Keyword" click → run keyword search + INSERT rows
-  8. delete_hierarchy      — "Delete Hierarchy" click → soft-delete (Valid_Hierarchy=False)
+Set the MAPBOX_TOKEN environment variable to use real Mapbox raster/vector
+styles (mapbox://styles/mapbox/light-v11), matching the original React app.
+Without a token, maps still render using the open "carto-positron" style.
 """
 
-from __future__ import annotations
-
-import logging
-import pandas as pd
+import json
+import warnings
 
 import dash
-from dash import dcc, html, Input, Output, State, dash_table, callback_context, no_update
-import dash_bootstrap_components as dbc
+from dash import Dash, dcc, html, Input, Output, State, ALL, ctx
+import plotly.graph_objects as go
 
-from goat_src.constants import ABOUT_TEXT, APP_TITLE
-from goat_src.queries import QueryService
-from goat_src.utils import (
-    build_project_status_chart,
-    build_lending_instrument_chart,
-    build_hierarchy_sunburst,
-    build_empty_chart,
-)
+import queries as q
+import utils as u
 
-# ── Logging ────────────────────────────────────────────────────────────────────
-logger = logging.getLogger(__name__)
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
-# ── App initialisation ─────────────────────────────────────────────────────────
-app = dash.Dash(
-    __name__,
-    external_stylesheets=[
-        dbc.themes.DARKLY,
-        # "assets/bootstrap-icons/bootstrap-icons.css",
-        # "https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css",
-    ],
-    suppress_callback_exceptions=True,
-    title="GoAT",
-    meta_tags=[{"name": "viewport", "content": "width=device-width, initial-scale=1"}],
-)
-server = app.server  # expose WSGI server for Posit Connect / gunicorn
+app = Dash(__name__, suppress_callback_exceptions=True, title=u.BASE_TITLE)
+server = app.server
 
-app.config.external_stylesheets.append(
-    app.get_asset_url("bootstrap-icons/bootstrap-icons.css")
-)
-# ── QueryService singleton ─────────────────────────────────────────────────────
-qs = QueryService.get_instance()
+# ══════════════════════════════════════════════════════════════════════════
+# Static content
+# ══════════════════════════════════════════════════════════════════════════
 
+BENCHMARKS = [
+    {
+        "name": "Climate Change Institutional Indicators (GCCIIs)",
+        "coverage": "Global",
+        "source": "World Bank",
+        "focus": "12 Indicators: law, coordination, long term strategy, national adaptation plan, fiscal "
+                 "risk statements, local climate risk, budget guidelines, expenditure tracking, public "
+                 "investment, SOE disclosure, sub-national strategies and risk assessments, environment in "
+                 "procurement",
+    },
+    {
+        "name": "GovTech Maturity Index: Core Government Systems Index (CGSI): Public Investment Management Systems",
+        "coverage": "Global",
+        "source": "World Bank",
+        "focus": "I-14: Is there a Public Investment Management System (PIMS) in place? I-15: Is there a "
+                 "government Open-Source Software (OSS) policy/action plan for public sector? I-17: Does "
+                 "government have a national strategy on disruptive / innovative technologies? I-1: Is "
+                 "there a cloud platform available for all government entities?",
+    },
+    {
+        "name": "Infrastructure Efficient Frontier",
+        "coverage": "Global",
+        "source": "World Bank",
+        "focus": "Based on the work of the Fiscal Policy Unit at the World Bank, the infrastructure "
+                 "efficiency analysis uses eight output indicators following the methodology developed by "
+                 "Herrera and Ouedraogo (2018) and Herrera, Isaka, and Ouedraogo (2025).",
+    },
+    {
+        "name": "Climate Change Institutional Assessment (CCIA)",
+        "coverage": "ECA Selected",
+        "source": "World Bank",
+        "focus": "74 indicators",
+    },
+    {
+        "name": "Climate-informed PIM Indicators",
+        "coverage": "ECA Selected (Western Balkans)",
+        "source": "World Bank",
+        "focus": "Policy (11), implementation (10), Climate (9)",
+    },
+    {
+        "name": "Infrastructure Services Evaluation",
+        "coverage": "Global",
+        "source": "IMF Methodology, Updated Global Data",
+        "focus": "Measures of infrastructure services such as road, rail, power, water, and digital access",
+    },
+    {
+        "name": "Global Quality Infrastructure Index (GQII)",
+        "coverage": "Global",
+        "source": "WBG Methodology, Updated Global Data",
+        "focus": "Measures of infrastructure services and quality of public investment",
+    },
+]
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# Style constants
-# ═══════════════════════════════════════════════════════════════════════════════
-
-_BG_ROOT    = "#141414"
-_BG_SIDEBAR = "#1a1a1a"
-_BG_CARD    = "#1e1e1e"
-_BG_HEADER  = "#1a1a1a"
-_BORDER     = "#2d2d2d"
-_ACCENT     = "#E63946"
-_TEXT_PRI   = "#FFFFFF"
-_TEXT_SEC   = "#CBD5E0"
-_TEXT_MUTED = "#A0AEC0"
-_TEXT_DELETE = "#353A40"
-_TEXT_LABEL = "#6E7178"
-
-_SIDEBAR_STYLE = {
-    "backgroundColor": _BG_SIDEBAR,
-    "border":          f"1px solid {_BORDER}",
-    "borderRadius":    "8px",
-    "padding":         "20px 16px",
-}
-
-_DD_STYLE = {
-    "marginBottom":    "8px",
-    "backgroundColor": "transparent",
-    "color":         _TEXT_DELETE,
-}
-
-_FILTER_LABEL = {
-    "color":         _TEXT_LABEL,        # brighter — was _TEXT_MUTED
-    "fontSize":      "12px",           # slightly larger
-    "fontWeight":    "500",
-    "letterSpacing": "0.04em",
-    "marginBottom":  "8px",
-    "marginTop":     "4px",
-    "display":       "block",
-}
-
-_MAIN_TAB = {
-    "color":           _TEXT_MUTED,
-    "backgroundColor": _BG_ROOT,
-    "border":          "none",
-    "borderBottom":    "2px solid transparent",
-    "padding":         "14px 24px",
-    "fontFamily":      "Fira Sans",
-    "fontSize":        "15px",
-}
-_MAIN_TAB_SEL = {
-    **_MAIN_TAB,
-    "color":        _ACCENT,
-    "borderBottom": f"2px solid {_ACCENT}",
-    "fontWeight":   "600",
-}
-
-_KW_SUB_TAB = {
-    "color":           _TEXT_MUTED,
-    "backgroundColor": _BG_ROOT,
-    "border":          "none",
-    "borderBottom":    "2px solid transparent",
-    "padding":         "10px 20px",
-    "fontFamily":      "Fira Sans",
-    "fontSize":        "13px",
-}
-_KW_SUB_TAB_SEL = {
-    **_KW_SUB_TAB,
-    "color":        _ACCENT,
-    "borderBottom": f"2px solid {_ACCENT}",
-    "fontWeight":   "600",
-}
-
-_CHART_TAB = {
-    "color":           _TEXT_MUTED,
-    "backgroundColor": _BG_CARD,
-    "border":          "none",
-    "borderBottom":    "2px solid transparent",
-    "padding":         "10px 18px",
-    "fontFamily":      "Fira Sans",
-    "fontSize":        "13px",
-}
-_CHART_TAB_SEL = {
-    **_CHART_TAB,
-    "color":        _ACCENT,
-    "borderBottom": f"2px solid {_ACCENT}",
-    "fontWeight":   "600",
-}
-
-_TABLE_CELL = {
-    "backgroundColor": _BG_CARD,
-    "color":           _TEXT_SEC,
-    "border":          f"1px solid {_BORDER}",
-    "fontFamily":      "Fira Sans",
-    "fontSize":        "12px",
-    "padding":         "8px 12px",
-    "textAlign":       "left",
-    "overflow":        "hidden",
-    "textOverflow":    "ellipsis",
-    "maxWidth":        "260px",
-    "whiteSpace":      "nowrap",
-}
-_TABLE_HEADER = {
-    "backgroundColor": "#252525",
-    "color":           _TEXT_PRI,
-    "fontWeight":      "600",
-    "border":          "1px solid #3a3a3a",
-    "fontSize":        "12px",
-    "padding":         "8px 12px",
-    "textAlign":       "left",
-    "textTransform":   "uppercase",
-    "letterSpacing":   "0.04em",
-}
-
-# Shared input / button styles for the Keywords forms
-_INPUT_STYLE = {
-    "backgroundColor": "#252525",
-    "color":           _TEXT_PRI,
-    "border":          f"1px solid {_BORDER}",
-    "borderRadius":    "6px",
-    "padding":         "8px 12px",
-    "width":           "100%",
-    "fontFamily":      "Fira Sans",
-    "fontSize":        "13px",
-    "marginBottom":    "16px",
-    "outline":         "none",
-}
-
-_FORM_LABEL = {
-    "color":         _TEXT_MUTED,
-    "fontSize":      "12px",
-    "letterSpacing": "0.04em",
-    "display":       "block",
-    "marginBottom":  "6px",
-}
-
-_FORM_CARD = {
-    "backgroundColor": _BG_SIDEBAR,
-    "border":          f"1px solid {_BORDER}",
-    "borderRadius":    "8px",
-    "padding":         "24px",
-    "maxWidth":        "640px",
-}
-
-_ALERT_SUCCESS = {
-    "backgroundColor": "#1a3a2a",
-    "border":          "1px solid #2d6a4f",
-    "borderRadius":    "6px",
-    "color":           "#68D391",
-    "padding":         "10px 14px",
-    "fontSize":        "13px",
-    "fontFamily":      "Fira Sans",
-    "marginTop":       "12px",
-}
-
-_ALERT_ERROR = {
-    "backgroundColor": "#3a1a1a",
-    "border":          "1px solid #E63946",
-    "borderRadius":    "6px",
-    "color":           "#FC8181",
-    "padding":         "10px 14px",
-    "fontSize":        "13px",
-    "fontFamily":      "Fira Sans",
-    "marginTop":       "12px",
-}
-
-_ALERT_INFO = {
-    "backgroundColor": "#1a2a3a",
-    "border":          "1px solid #4299E1",
-    "borderRadius":    "6px",
-    "color":           "#90CDF4",
-    "padding":         "10px 14px",
-    "fontSize":        "13px",
-    "fontFamily":      "Fira Sans",
-    "marginTop":       "12px",
-}
+EF_CUSTOM_ORDER = q.EF_SHORT_NAME_ORDER
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# Layout helpers — Dashboard tab
-# ═══════════════════════════════════════════════════════════════════════════════
+# ══════════════════════════════════════════════════════════════════════════
+# Layouts
+# ══════════════════════════════════════════════════════════════════════════
 
-def _filter_sidebar() -> html.Div:
-    """Left-hand sidebar with all Dashboard filter controls."""
-    return html.Div(
-        style=_SIDEBAR_STYLE,
-        children=[
-            html.Div([
-                html.Label("Select Lending Instrument", style=_FILTER_LABEL),
-                dcc.Dropdown(id="dd-lending-instr", multi=True, placeholder="Loading…",
-                            style=_DD_STYLE, optionHeight=40),
-            ], style={"marginBottom": "20px"}),
-            html.Div([
-                html.Label("Select Region", style=_FILTER_LABEL),
-                dcc.Dropdown(id="dd-region", multi=True, placeholder="Loading…",
-                            style=_DD_STYLE, optionHeight=40),
-            ], style={"marginBottom": "20px"}),
-            html.Div([
-                html.Label("Filter by Keywords", style=_FILTER_LABEL),
-                dcc.Dropdown(id="dd-keywords", multi=True, placeholder="Choose hierarchy",
-                            style=_DD_STYLE),
-            ], style={"marginBottom": "20px"}),
-            html.Label("Keyword filter logic", style=_FILTER_LABEL),
-            dcc.RadioItems(
-                id="radio-and-or",
-                options=[
-                    {"label": "  AND  — project must match all selected hierarchies", "value": "AND"},
-                    {"label": "  OR   — project must match any selected hierarchy",   "value": "OR"},
-                ],
-                value="AND",
-                labelStyle={
-                    "display":      "block",
-                    "color":        _TEXT_SEC,
-                    "fontSize":     "12px",
-                    "marginBottom": "6px",
-                    "cursor":       "pointer",
-                },
-                inputStyle={"marginRight": "6px", "accentColor": _ACCENT},
-                style={"marginBottom": "24px"},
-            ),
-            dbc.Button(
-                children=[html.I(className="bi bi-funnel-fill me-2"), "Apply Filters"],
-                id="btn-apply",
-                color="danger",
-                className="w-100",
-                n_clicks=0,
-                style={"borderRadius": "6px", "fontWeight": "600", "fontSize": "14px"},
-            ),
-        ],
-    )
-
-
-def _download_tab_content() -> html.Div:
-    """Content of the Download Data sub-tab."""
-    return html.Div(
-        style={"padding": "16px 0"},
-        children=[
-            html.Div(
-                style={
-                    "display":        "flex",
-                    "justifyContent": "space-between",
-                    "alignItems":     "center",
-                    "marginBottom":   "14px",
-                },
-                children=[
-                    html.H5(
-                        "Download Projects",
-                        style={"color": _TEXT_PRI, "margin": "0", "fontWeight": "600"},
-                    ),
-                    dbc.Button(
-                        [html.I(className="bi bi-download me-2"), "Export CSV"],
-                        id="btn-export-csv",
-                        color="danger",
-                        outline=True,
-                        size="sm",
-                        n_clicks=0,
-                        style={"borderRadius": "5px"},
-                    ),
-                ],
-            ),
-            dcc.Download(id="download-csv"),
-            dash_table.DataTable(
-                id="tbl-download",
-                page_size=15,
-                filter_action="native",
-                sort_action="native",
-                style_table={"overflowX": "auto"},
-                style_cell=_TABLE_CELL,
-                style_header=_TABLE_HEADER,
-                style_data_conditional=[
-                    {"if": {"row_index": "odd"}, "backgroundColor": "#222222"}
-                ],
-                tooltip_delay=0,
-                tooltip_duration=None,
-            ),
-        ],
-    )
-
-
-def _dashboard_content() -> html.Div:
-    """Full Dashboard tab: sidebar + metric + chart sub-tabs."""
-    return html.Div(
-        style={"display": "flex", "gap": "20px", "padding": "20px 0"},
-        children=[
-            html.Div(_filter_sidebar(), style={"width": "300px", "flexShrink": "0"}),
-            html.Div(
-                style={"flex": "1", "minWidth": "0"},
-                children=[
-                    html.Div(
-                        style={"marginBottom": "22px"},
-                        children=[
-                            html.Span(
-                                "Total Number of Projects",
-                                style={"color": _TEXT_MUTED, "fontSize": "13px", "display": "block"},
-                            ),
-                            html.H2(
-                                id="metric-total",
-                                children="—",
-                                style={
-                                    "color":      _TEXT_PRI,
-                                    "fontSize":   "44px",
-                                    "margin":     "4px 0 0",
-                                    "lineHeight": "1",
-                                    "fontFamily": "Fira Sans",
-                                },
-                            ),
-                        ],
-                    ),
-                    dcc.Loading(
-                        type="circle",
-                        color=_ACCENT,
-                        children=dcc.Tabs(
-                            id="chart-tabs",
-                            value="tab-status",
-                            style={"borderBottom": f"1px solid {_BORDER}", "marginBottom": "0"},
-                            children=[
-                                dcc.Tab(
-                                    label="Project Status",
-                                    value="tab-status",
-                                    style=_CHART_TAB,
-                                    selected_style=_CHART_TAB_SEL,
-                                    children=[
-                                        dcc.Graph(
-                                            id="chart-project-status",
-                                            config={
-                                                "displayModeBar": True,
-                                                "displaylogo":    False,
-                                                "modeBarButtonsToRemove": ["select2d", "lasso2d"],
-                                                "toImageButtonOptions": {
-                                                    "format": "svg",  # Bypasses the blocked 'blob:' format
-                                                    "filename": "project_status_chart",
-                                                    "scale": 1
-                                                }
-                                            },
-                                            style={"height": "460px"},
-                                        )
-                                    ],
-                                ),
-                                dcc.Tab(
-                                    label="Lending Instrument",
-                                    value="tab-lending",
-                                    style=_CHART_TAB,
-                                    selected_style=_CHART_TAB_SEL,
-                                    children=[
-                                        dcc.Graph(
-                                            id="chart-lending-instr",
-                                            config={
-                                                "displayModeBar": True,
-                                                "displaylogo":    False,
-                                                "modeBarButtonsToRemove": ["select2d", "lasso2d"],
-                                                "toImageButtonOptions": {
-                                                    "format": "svg",  # Bypasses the blocked 'blob:' format
-                                                    "filename": "lending_instrument_chart",
-                                                    "scale": 1
-                                                }
-                                            },
-                                            style={"height": "460px"},
-                                        )
-                                    ],
-                                ),
-                                dcc.Tab(
-                                    label="Download Data",
-                                    value="tab-download",
-                                    style=_CHART_TAB,
-                                    selected_style=_CHART_TAB_SEL,
-                                    children=[_download_tab_content()],
-                                ),
-                            ],
-                        ),
-                    ),
-                ],
-            ),
-        ],
-    )
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Layout helpers — Keywords tab
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def _keywords_available_hierarchies() -> html.Div:
-    """
-    Sub-tab 1: Available Hierarchies.
-    Displays a sunburst chart where the inner ring = hierarchy full-name
-    and the outer ring = individual keywords.
-    """
-    return html.Div(
-        style={"padding": "24px 0"},
-        children=[
-            html.H5(
-                "Available Keyword Hierarchies",
-                style={"color": _TEXT_PRI, "marginBottom": "6px", "fontWeight": "600"},
-            ),
-            html.P(
-                "The inner ring shows hierarchy names; the outer ring shows their individual keywords. "
-                "Click a segment to zoom in.",
-                style={"color": _TEXT_MUTED, "fontSize": "13px", "marginBottom": "20px"},
-            ),
-            dcc.Loading(
-                id="loading-sunburst",
-                type="circle",
-                color=_ACCENT,
-                children=dcc.Graph(
-                    id="chart-hierarchy-sunburst",
-                    config={
-                        "displayModeBar": False,
-                        "displaylogo":    False,
-                        "toImageButtonOptions": {
-                            "format": "svg",  # Bypasses the blocked 'blob:' format
-                            "filename": "hierarchy_chart",
-                            "scale": 1
-                        }
-                    },
-                    style={"height": "600px"},
-                    figure=build_empty_chart("Loading hierarchy data…"),
-                ),
-            ),
-        ],
-    )
-
-
-def _keywords_add_new() -> html.Div:
-    """
-    Sub-tab 2: Add New Keywords.
-
-    Inputs:
-      • Hierarchy Name  (short code, e.g. "PIM")
-      • Full Name       (e.g. "Public Investment Management")
-      • Keywords        (comma-separated)
-
-    On submit:
-      1. Vectorised keyword search over all project text columns.
-      2. New rows inserted into the UC table with Valid_Hierarchy = 'True'.
-    """
-    return html.Div(
-        style={"padding": "24px 0"},
-        children=[
-            html.H5(
-                "Add New Keyword Hierarchy",
-                style={"color": _TEXT_PRI, "marginBottom": "6px", "fontWeight": "600"},
-            ),
-            html.P(
-                "Define a new thematic hierarchy and its associated keywords. "
-                "A keyword search will be run across all project text fields and "
-                "results will be persisted to the database.",
-                style={"color": _TEXT_MUTED, "fontSize": "13px", "marginBottom": "24px"},
-            ),
-
-            html.Div(
-                style=_FORM_CARD,
-                children=[
-                    # ── Hierarchy Name ─────────────────────────────────────────
-                    html.Label("Hierarchy Name (e.g., PIM)", style=_FORM_LABEL),
-                    dcc.Input(
-                        id="input-hier-name",
-                        type="text",
-                        placeholder="e.g., PIM",
-                        debounce=False,
-                        style=_INPUT_STYLE,
-                    ),
-
-                    # ── Full Name ──────────────────────────────────────────────
-                    html.Label("Full Name (e.g., Public Investment Management)", style=_FORM_LABEL),
-                    dcc.Input(
-                        id="input-hier-fullname",
-                        type="text",
-                        placeholder="e.g., Public Investment Management",
-                        debounce=False,
-                        style=_INPUT_STYLE,
-                    ),
-
-                    # ── Keywords ───────────────────────────────────────────────
-                    html.Label("Keywords (comma-separated)", style=_FORM_LABEL),
-                    dcc.Input(
-                        id="input-hier-keywords",
-                        type="text",
-                        placeholder="e.g., public investment, capital budget, appraisal",
-                        debounce=False,
-                        style=_INPUT_STYLE,
-                    ),
-
-                    # ── Info note ──────────────────────────────────────────────
-                    html.Div(
-                        [
-                            html.I(className="bi bi-info-circle me-2"),
-                            "This will search World Bank project records. "
-                            "Processing may take 30–90 seconds. Please do not close the window.",
-                        ],
-                        style={**_ALERT_INFO, "marginTop": "0", "marginBottom": "16px"},
-                    ),
-
-                    # ── Submit button ──────────────────────────────────────────
-                    dbc.Button(
-                        [html.I(className="bi bi-plus-circle me-2"), "Add Keyword"],
-                        id="btn-add-keyword",
-                        color="danger",
-                        n_clicks=0,
-                        style={
-                            "borderRadius": "6px",
-                            "fontWeight":   "600",
-                            "fontSize":     "14px",
-                            "minWidth":     "160px",
-                        },
-                        disabled=False,
-                    ),
-
-                    # ── Feedback area ──────────────────────────────────────────
-                    dcc.Loading(
-                        id="loading-add-kw",
-                        type="dot",
-                        color=_ACCENT,
-                        children=html.Div(id="add-kw-feedback", style={"minHeight": "48px"}),
-                    ),
-                ],
-            ),
-        ],
-    )
-
-
-def _keywords_delete_hierarchy() -> html.Div:
-    """
-    Sub-tab 3: Delete Hierarchy.
-
-    Shows a dropdown of all currently valid hierarchies.
-    On submit, Valid_Hierarchy is flipped to 'False' in the UC table —
-    no rows are physically deleted.
-    """
-    return html.Div(
-        style={"padding": "24px 0"},
-        children=[
-            html.H5(
-                "Deactivate a Hierarchy",
-                style={"color": _TEXT_PRI, "marginBottom": "6px", "fontWeight": "600"},
-            ),
-            html.P(
-                "Selecting a hierarchy below will mark it as inactive. "
-                "It will no longer appear in the Dashboard filters or charts, "
-                "but the data is preserved and can be restored if needed.",
-                style={"color": _TEXT_MUTED, "fontSize": "13px", "marginBottom": "24px"},
-            ),
-
-            html.Div(
-                style=_FORM_CARD,
-                children=[
-                    html.Label("Select a Hierarchy to Deactivate", style=_FORM_LABEL),
-                    dcc.Dropdown(
-                        id="dd-delete-hierarchy",
-                        placeholder="Loading hierarchies…",
-                        clearable=True,
-                        style={
-                            "backgroundColor": "#252525",
-                            "color":           _TEXT_DELETE,
-                            "border":          f"1px solid {_BORDER}",
-                            "borderRadius":    "6px",
-                            "marginBottom":    "20px",
-                        },
-                    ),
-
-                    # ── Warning banner ─────────────────────────────────────────
-                    html.Div(
-                        [
-                            html.I(className="bi bi-exclamation-triangle me-2"),
-                            "This action hides the hierarchy from all users immediately. "
-                            "It does not permanently delete any data.",
-                        ],
-                        style={
-                            "backgroundColor": "#3a2a1a",
-                            "border":          "1px solid #F6AD55",
-                            "borderRadius":    "6px",
-                            "color":           "#F6AD55",
-                            "padding":         "10px 14px",
-                            "fontSize":        "13px",
-                            "fontFamily":      "Fira Sans",
-                            "marginBottom":    "20px",
-                        },
-                    ),
-
-                    dbc.Button(
-                        [html.I(className="bi bi-trash me-2"), "Delete Hierarchy"],
-                        id="btn-delete-hierarchy",
-                        color="danger",
-                        outline=True,
-                        n_clicks=0,
-                        style={
-                            "borderRadius": "6px",
-                            "fontWeight":   "600",
-                            "fontSize":     "14px",
-                            "minWidth":     "180px",
-                        },
-                    ),
-
-                    # ── Feedback area ──────────────────────────────────────────
-                    html.Div(id="delete-hier-feedback", style={"minHeight": "48px"}),
-                ],
-            ),
-        ],
-    )
-
-
-def _keywords_tab_content() -> html.Div:
-    """Full Keywords tab: three sub-tabs."""
-    return html.Div(
-        style={"padding": "20px 0"},
-        children=[
-            dcc.Tabs(
-                id="kw-sub-tabs",
-                value="kw-available",
-                style={"borderBottom": f"1px solid {_BORDER}", "marginBottom": "0"},
-                children=[
-                    dcc.Tab(
-                        label="Available Hierarchies",
-                        value="kw-available",
-                        style=_KW_SUB_TAB,
-                        selected_style=_KW_SUB_TAB_SEL,
-                        children=[_keywords_available_hierarchies()],
-                    ),
-                    dcc.Tab(
-                        label="Add New Keywords",
-                        value="kw-add",
-                        style=_KW_SUB_TAB,
-                        selected_style=_KW_SUB_TAB_SEL,
-                        children=[_keywords_add_new()],
-                    ),
-                    dcc.Tab(
-                        label="Delete Hierarchy",
-                        value="kw-delete",
-                        style=_KW_SUB_TAB,
-                        selected_style=_KW_SUB_TAB_SEL,
-                        children=[_keywords_delete_hierarchy()],
-                    ),
-                ],
-            ),
-        ],
-    )
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Layout helper — About tab
-# ═══════════════════════════════════════════════════════════════════════════════
-
-def _about_content() -> html.Div:
-    """
-    Structured About page.
-
-    Layout:
-      1. Hero banner  — title, subtitle, operation-type pills
-      2. Info cards   — three quick-fact tiles (what / who / how)
-      3. Body section — four collapsible text sections with accent borders
-      4. Data access  — small table of access modes
-      5. Footer strip — maintainer credit
-    """
-
-    # ── Shared inline helpers ──────────────────────────────────────────────────
-    def _tag(label: str) -> html.Span:
-        return html.Span(label, className="about-tag")
-
-    def _card(icon, title: str, body: str) -> html.Div:
-        # icon can be a string (emoji) or a Dash component (html.I)
-        icon_element = html.Span(icon, className="about-card-icon") if isinstance(icon, str) else html.Div(icon, className="about-card-icon")
-        return html.Div(
-            className="about-card",
-            children=[
-                icon_element,
-                html.P(title, className="about-card-title"),
-                html.P(body,  className="about-card-body"),
-            ],
+def introduction_layout(pathname):
+    rows = []
+    for b in BENCHMARKS:
+        rows.append(
+            html.Tr([
+                html.Td(b["name"], className="bench-name"),
+                html.Td(b["coverage"], className="bench-cell"),
+                html.Td(b["source"], className="bench-cell"),
+                html.Td(b["focus"], className="bench-focus"),
+            ])
         )
 
-    def _section(title: str, body) -> html.Div:
-        """body can be a string or a list of Dash components."""
-        return html.Div(
-            className="about-section",
-            children=[
-                html.Div(
-                    className="about-section-header",
-                    children=[
-                        html.Div(className="about-section-dot"),
-                        html.P(title, className="about-section-title"),
-                    ],
-                ),
-                html.P(body, className="about-section-text")
-                if isinstance(body, str)
-                else html.Div(body, className="about-section-text"),
-            ],
-        )
-
-    # ── Access modes table rows ────────────────────────────────────────────────
-    access_rows = [
-        ("Public API",         "DPO, IPL, PfoR",    "World Bank Data Catalogue", "Public"),
-        ("Internal / OUO",     "All operation types", "Internal deployment",     "Authenticated"),
-        ("Generative AI demo", "PAG sub-types",      "Project-level text fields","Internal"),
-    ]
-
-    access_table = html.Table(
-        className="about-access-table",
+    table = html.Table(
+        className="benchmarks-table",
         children=[
             html.Thead(html.Tr([
-                html.Th("Interface"),
-                html.Th("Scope"),
-                html.Th("Data Source"),
-                html.Th("Access Level"),
+                html.Th("Benchmarks"), html.Th("Coverage"), html.Th("Source"), html.Th("Focus"),
             ])),
-            html.Tbody([
-                html.Tr([html.Td(c) for c in row])
-                for row in access_rows
-            ]),
+            html.Tbody(rows),
         ],
     )
 
-    # ── Assemble ───────────────────────────────────────────────────────────────
-    return html.Div(
-        style={"maxWidth": "980px", "padding": "36px 0 60px"},
-        children=[
-
-            # 1 ── Hero ────────────────────────────────────────────────────────
-            html.Div(
-                className="about-hero",
-                children=[
-                    # html.Span("WORLD BANK · PIIAG CoP · P179442", className="about-hero-eyebrow"),
-                    html.H1("Governance Operations Analytics Tool", className="about-hero-title"),
-                    html.P(
-                        "GoAT enables targeted, keyword-driven searches across the World Bank's "
-                        "three core operation types — providing a real-time operational intelligence "
-                        "layer on top of public investment financing data.",
-                        className="about-hero-subtitle",
-                    ),
-                    html.Div(
-                        className="about-tag-row",
-                        children=[
-                            _tag("Development Policy Operations (DPO)"),
-                            _tag("Investment Project Lending (IPL)"),
-                            _tag("Program for Results (PfoR)"),
-                            _tag("Climate Co-Benefits (CCBs)"),
-                        ],
-                    ),
-                ],
-            ),
-
-            # 2 ── Info cards ──────────────────────────────────────────────────
-            html.Div(
-                className="about-cards-grid",
-                children=[
-                    _card(
-                        html.I(className="bi bi-search"),
-                        "What GoAT Does",
-                        "Maps thematic keyword clusters — PIM, PAM, SOEs, CCBs — "
-                        "to Bank operations, surfacing projects that match user-defined "
-                        "search hierarchies across PDOs, indicators, and prior actions.",
-                    ),
-                    _card(
-                        html.I(className="bi bi-building"),
-                        "Who Maintains It",
-                        "Operated by the World Bank's Global Community of Practice for "
-                        "Public Infrastructure Investments and Asset Governance (PIIAG), "
-                        "project P179442.",
-                    ),
-                    _card(
-                        html.I(className="bi bi-lightning-fill"),
-                        "How It Works",
-                        "Combines a Databricks Unity Catalog backend with an interactive "
-                        "Dash front-end. Users can add or modify keyword hierarchies on "
-                        "the fly; results update in real time.",
-                    ),
-                ],
-            ),
-
-            # 3 ── Body sections ───────────────────────────────────────────────
-            _section(
-                "Keyword Hierarchy Search",
-                "Clusters of keywords can be mapped to a thematic hierarchy — for example, "
-                "Public Investment Management (PIM), Public Asset Management (PAM), or "
-                "State-Owned Enterprises (SOEs). GoAT searches across project objectives, "
-                "development-policy prior actions, results indicators, disbursement-linked "
-                "indicators, and component descriptions, then tags each project "
-                "Yes / No per hierarchy.",
-            ),
-
-            _section(
-                "Data Coverage & Transparency",
-                "GoAT targets Board-Approved operations as well as upstream pipeline "
-                "operations (Concept and Appraisal stage). Where data is available through "
-                "the World Bank's public Data Catalogue APIs, the tool operates in public "
-                "mode. Datasets that are official-use-only are surfaced only via "
-                "internally-authenticated deployments.",
-            ),
-
-            _section(
-                "Generative AI Integration",
-                "GoAT progressively demonstrates how generative AI can be applied to "
-                "structured project information — for example, all World Bank projects "
-                "with a substantive focus on Public Asset Governance or a sub-type "
-                "thereof. This layer is currently scoped to internal demonstrations.",
-            ),
-
-            _section(
-                "Interface Modes",
-                [
-                    html.Span(
-                        "GoAT is available in two deployment modes. "
-                        "The table below summarises current access paths.",
-                        style={"display": "block", "marginBottom": "12px"},
-                    ),
-                    access_table,
-                ],
-            ),
-
-            # 4 ── Footer strip ────────────────────────────────────────────────
-            html.Div(
-                className="about-footer",
-                children=[
-                    html.I(className="bi bi-mailbox", style={"fontSize": "20px", "flexShrink": "0"}),
-                    html.P(
-                        [
-                            html.Strong("Maintained by "),
-                            "the World Bank PIIAG Global CoP (P179442). "
-                            "For questions, access requests, or to contribute a new keyword "
-                            "hierarchy, contact the CoP team through the World Bank internal "
-                            "collaboration channels.",
-                        ],
-                        className="about-footer-text",
-                    ),
-                ],
-            ),
-
-            # 5 ── Partner logos and contact ────────────────────────────────────
-            html.Div(
-                className="about-partners-section",
-                children=[
-                    html.Div(
-                        className="about-partners-content",
-                        children=[
-                            html.Div(
-                                className="about-logos-container",
-                                children=[
-                                    html.Div(
-                                        className="about-logo-item",
-                                        children=[
-                                            html.Img(
-                                                src=app.get_asset_url('The-World-Bank-group-white.png'),
-                                                alt="World Bank",
-                                                className="about-partner-logo",
-                                            ),
-                                        ],
-                                    ),
-                                    html.Div(
-                                        className="about-logo-item",
-                                        children=[
-                                            html.Img(
-                                                src=app.get_asset_url('Pim-pam_white_logo.png'),
-                                                alt="PIM-PAM",
-                                                className="about-partner-logo",
-                                            ),
-                                        ],
-                                    ),
-                                ],
-                            ),
-                            html.Div(
-                                className="about-contact-section",
-                                children=[
-                                    html.P(
-                                        "For any questions, please email:",
-                                        className="about-contact-label",
-                                    ),
-                                    html.A(
-                                        "kkaiser@worldbank.org",
-                                        href="mailto:kkaiser@worldbank.org",
-                                        className="about-contact-email",
-                                    ),
-                                ],
-                            ),
-                        ],
-                    ),
-                ],
-            ),
-        ],
-    )
-
-
-# ═══════════════════════════════════════════════════════════════════════════════
-# Full app layout
-# ═══════════════════════════════════════════════════════════════════════════════
-
-app.layout = html.Div(
-    style={
-        "backgroundColor": _BG_ROOT,
-        "minHeight":       "100vh",
-        "fontFamily":      "Fira Sans",
-    },
-    children=[
-        # ── Hidden stores ──────────────────────────────────────────────────────
-        dcc.Store(id="store-download"),
-        # Stores for keywords tab state refresh triggers
-        dcc.Store(id="store-kw-refresh", data=0),
-
-        # dcc.Location fires once on page load — triggers init callbacks.
-        dcc.Location(id="url", refresh=False),
-
-        # ── Header ─────────────────────────────────────────────────────────────
-        html.Div(
-            style={
-                "backgroundColor": _BG_HEADER,
-                "borderBottom":    f"1px solid {_BORDER}",
-                "padding":         "14px 32px",
-            },
+    main = html.Main(
+        className="intro-main",
+        children=html.Div(
+            className="intro-content",
             children=[
-                html.Div(
-                    style={"display": "flex", "alignItems": "center", "gap": "14px"},
-                    children=[
-                        html.Img(
-                            src=app.get_asset_url('Logo.png'),
-                            style={"height": "55px", "width": "55px"},
-                        ),
-                        html.H1(
-                            APP_TITLE,
-                            style={
-                                "color":         _TEXT_PRI,
-                                "fontSize":      "35px",
-                                "fontWeight":    "700",
-                                "fontFamily":    "Fira Sans",
-                                "margin":        "0",
-                                "letterSpacing": "-0.01em",
-                            },
-                        ),
-                    ],
-                )
+                html.H1("PFM4CA Country Benchmarking Tool", className="intro-title"),
+                html.P(
+                    "The Country Benchmarking Tool (CBT) helps visualize PFM4CA performance across a "
+                    "curated set of global and regional measures. PFM4CA benchmarking typically can be "
+                    "done through a single summary measure, as well as looking at sub-indicators. The "
+                    "current CBT presents the selection of indicators set out below. Feel free to explore "
+                    "the summary mappings, as well as to review country-specific indicators by hovering "
+                    "over the maps!",
+                    className="intro-desc",
+                ),
+                html.Div(table, className="table-scroll"),
             ],
         ),
+    )
 
-        # ── Main tab container ─────────────────────────────────────────────────
-        html.Div(
-            style={"maxWidth": "1440px", "margin": "0 auto", "padding": "0 32px 40px"},
+    return html.Div(
+        className="page-shell",
+        children=[
+            u.build_header(pathname),
+            html.Div(className="body-shell", children=[u.build_home_nav_sidebar(pathname), main]),
+        ],
+    )
+
+
+def _map_page_shell(pathname, sidebar_children, map_id, legend_id, popup_id):
+    main = html.Main(
+        className="map-main",
+        children=html.Div(
+            className="map-container",
             children=[
-                dcc.Tabs(
-                    id="main-tabs",
-                    value="dashboard",
-                    style={"borderBottom": f"1px solid {_BORDER}", "marginBottom": "0"},
-                    children=[
-
-                        # ── Tab 1: Dashboard ───────────────────────────────────
-                        dcc.Tab(
-                            label="Dashboard",
-                            value="dashboard",
-                            style=_MAIN_TAB,
-                            selected_style=_MAIN_TAB_SEL,
-                            children=[_dashboard_content()],
-                        ),
-
-                        # ── Tab 2: Keywords ────────────────────────────────────
-                        dcc.Tab(
-                            label="Keywords",
-                            value="keywords",
-                            style=_MAIN_TAB,
-                            selected_style=_MAIN_TAB_SEL,
-                            children=[_keywords_tab_content()],
-                        ),
-
-                        # ── Tab 3: About ───────────────────────────────────────
-                        dcc.Tab(
-                            label="About",
-                            value="about",
-                            style=_MAIN_TAB,
-                            selected_style=_MAIN_TAB_SEL,
-                            children=[_about_content()],
-                        ),
-                    ],
+                dcc.Graph(
+                    id=map_id,
+                    className="map-graph",
+                    style={"width": "100%", "height": "100%"},
+                    config={"displayModeBar": False, "scrollZoom": True},
+                    figure=go.Figure(),
+                ),
+                html.Div(id=legend_id),
+                html.Div(id=popup_id, children=u.build_popup_panel(visible=False)),
+                html.Div(
+                    className="map-loading-overlay",
+                    id=f"{map_id}-loading",
+                    style={"display": "none"},
                 ),
             ],
         ),
-    ],
-)
+    )
+    return html.Div(
+        className="page-shell",
+        children=[
+            u.build_header(pathname),
+            html.Div(
+                className="body-shell",
+                children=[u.build_sub_nav_sidebar(sidebar_children), main],
+            ),
+        ],
+    )
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# Callbacks — Dashboard
-# ═══════════════════════════════════════════════════════════════════════════════
-
-# ── 1. Init: populate Lending Instrument + Keywords dropdowns on page load ─────
-
-@app.callback(
-    Output("dd-lending-instr", "options"),
-    Output("dd-lending-instr", "value"),
-    Output("dd-keywords",      "options"),
-    Input("url",               "href"),
-    prevent_initial_call=False,
-)
-def init_filter_options(href):
-    """
-    Fires once on page load.  Fetches distinct lending instruments and
-    hierarchy names and pre-selects all instruments.
-    """
-    try:
-        instruments, hierarchies = qs.get_filter_options()
-        instr_opts = [{"label": v, "value": v} for v in instruments]
-        hier_opts  = [{"label": v, "value": v} for v in hierarchies]
-        logger.info(
-            "[GoAT] Filter options loaded: %d instruments, %d hierarchies",
-            len(instruments), len(hierarchies),
-        )
-        return instr_opts, instruments, hier_opts
-    except Exception as exc:
-        logger.error("[GoAT] init_filter_options error: %s", exc)
-        return [], [], []
+def gccii_layout(pathname):
+    sidebar = [
+        u.form_field("Region", u.styled_select("gccii-region", u.GLOBAL_REGIONS, u.GLOBAL_REGIONS[0])),
+        u.info_blocks_section([
+            ("Data Visualization", "Global Climate Change Institutional Indicators (GCCIIs), produced by "
+                                    "the Climate Governance Program of the Prosperity Vertical Institutions "
+                                    "Development"),
+            ("Data Overview", "The current draft dataset for 2024 covers 12 indicators for 182 countries"),
+            ("Explore", "Use the drop-down menu to focus on a World Bank Group Region, and click on the "
+                        "country to see the detailed indicators"),
+            ("Notes", "The indicators are quantified as 0 (no information/none), partial (0.5), and "
+                      "present (1). The summary is the average of these scores."),
+        ]),
+    ]
+    return _map_page_shell(pathname, sidebar, "gccii-map", "gccii-legend", "gccii-popup")
 
 
-# ── 2. Cascade: Region options update when Lending Instrument changes ──────────
-
-@app.callback(
-    Output("dd-region", "options"),
-    Output("dd-region", "value"),
-    Input("dd-lending-instr", "value"),
-    prevent_initial_call=False,
-)
-def cascade_regions(instruments):
-    try:
-        regions = qs.get_region_options(instruments or [])
-        opts    = [{"label": v, "value": v} for v in regions]
-        return opts, regions
-    except Exception as exc:
-        logger.error("[GoAT] cascade_regions error: %s", exc)
-        return [], []
+def gtmi_layout(pathname):
+    sidebar = [
+        u.form_field("Region", u.styled_select("gtmi-region", u.GLOBAL_REGIONS, u.GLOBAL_REGIONS[0])),
+        u.form_field("Main Pillar", u.styled_select("gtmi-pillar", q.GTMI_PILLARS, "PIMS")),
+        u.info_blocks_section([
+            ("Data Visualization", "2022 Central Government (CG) GTMI survey data produced by the World "
+                                    "Bank Group"),
+            ("Data Overview", "The current draft dataset for 2024 covers 48 key indicators with 4 main "
+                               "groups for 198 countries"),
+            ("Explore", "Use the drop-down menu to focus on a World Bank Group Region, and click on the "
+                        "country to see the detailed indicators"),
+        ]),
+    ]
+    return _map_page_shell(pathname, sidebar, "gtmi-map", "gtmi-legend", "gtmi-popup")
 
 
-# ── 3. Apply Filters ────────────────────────────────────────────────────────────
-
-@app.callback(
-    Output("metric-total",         "children"),
-    Output("chart-project-status", "figure"),
-    Output("chart-lending-instr",  "figure"),
-    Output("store-download",       "data"),
-    Input("btn-apply",             "n_clicks"),
-    State("dd-lending-instr",      "value"),
-    State("dd-region",             "value"),
-    State("dd-keywords",           "value"),
-    State("radio-and-or",          "value"),
-    prevent_initial_call=False,
-)
-def apply_filters(n_clicks, instruments, regions, keywords, and_or):
-    """
-    Central data-fetch callback.  Runs on page load and on every Apply click.
-    """
-    instrs = instruments or []
-    rgns   = regions     or []
-    kws    = keywords    or []
-    ao     = and_or      or "AND"
-
-    try:
-        total      = qs.get_total_count(instrs, rgns, kws, ao)
-        status_df  = qs.get_project_status_data(instrs, rgns, kws, ao)
-        lending_df = qs.get_lending_instrument_data(instrs, rgns, kws, ao)
-        dl_df      = qs.get_download_data(instrs, rgns, kws, ao)
-
-        logger.info(
-            "[GoAT] apply_filters: %d instruments, %d regions, %d keywords, "
-            "and_or=%s → %d distinct projects",
-            len(instrs), len(rgns), len(kws), ao, total,
-        )
-
-        return (
-            f"{total:,}",
-            build_project_status_chart(status_df),
-            build_lending_instrument_chart(lending_df),
-            dl_df.to_dict("records"),
-        )
-
-    except Exception as exc:
-        logger.error("[GoAT] apply_filters error: %s", exc)
-        err_fig = build_empty_chart(f"Query failed — {exc}")
-        return "—", err_fig, err_fig, []
+def ccia_layout(pathname):
+    pillars = ["Overall"] + q.ccia_pillars()
+    sidebar = [
+        u.form_field("Country Management Unit", u.styled_select("ccia-region", u.LOCAL_REGIONS, u.LOCAL_REGIONS[0])),
+        u.form_field("Pillar", u.styled_select("ccia-pillar", pillars, "Overall")),
+        u.info_blocks_section([
+            ("Data Visualization", "Climate Change Institutional Assessment (CCIA), produced by the "
+                                    "Climate Governance Program of the Prosperity Vertical Institutions "
+                                    "Development"),
+            ("Data Overview", "The current draft dataset for 2024 covers 74 indicators for 11 countries"),
+            ("Explore", "Use the drop-down menu to focus on a World Bank Group Country Management Unit, "
+                        "and click on the country to see the detailed indicators"),
+            ("Notes", "The indicators are quantified based on the scale of 1 to 6. The summary is the "
+                      "average of these scores."),
+        ]),
+    ]
+    return _map_page_shell(pathname, sidebar, "ccia-map", "ccia-legend", "ccia-popup")
 
 
-# ── 4. Render download DataTable from store ────────────────────────────────────
+def infra_layout(pathname):
+    sidebar = [
+        u.form_field("Region", u.styled_select("infra-region", u.GLOBAL_REGIONS, u.GLOBAL_REGIONS[0])),
+        u.info_blocks_section([
+            ("Data Visualization", "Infrastructure Services Evaluation, produced by the Climate Governance "
+                                    "Program of the Prosperity Vertical Institutions Development"),
+            ("Data Overview", "The current draft dataset for 2019 covers 6 indicators for 220 countries"),
+            ("Notes", "The Infrastructure gap is done using the gap between countries' scores and regional "
+                      "average score of each indicator. Countries in which one or more scores are missing "
+                      "are exempted from the calculation and shown in gray."),
+        ]),
+    ]
+    return _map_page_shell(pathname, sidebar, "infra-map", "infra-legend", "infra-popup")
 
-@app.callback(
-    Output("tbl-download", "data"),
-    Output("tbl-download", "columns"),
-    Output("tbl-download", "tooltip_data"),
-    Input("store-download", "data"),
-)
-def render_download_table(records):
-    if not records:
-        return [], [], []
 
-    df   = pd.DataFrame(records)
-    cols = [{"name": c, "id": c, "deletable": False} for c in df.columns]
+def piiag_layout(pathname):
+    sections = ["Overall"] + q.piiag_sections()
+    sidebar = [
+        u.form_field("Country Management Unit", u.styled_select("piiag-region", u.LOCAL_REGIONS, u.LOCAL_REGIONS[0])),
+        u.form_field("Section", u.styled_select("piiag-section", sections, "Overall")),
+        u.info_blocks_section([
+            ("Data Visualization", "ECA Public Infrastructure Investment and Asset Governance Tracker (PIIAG)"),
+            ("Data Overview", "The current draft dataset for 2024 covers 29 indicators across 3 sections "
+                               "for 6 countries"),
+            ("Notes", "The indicators are quantified as 0 (no information/none), partial (0.5), and "
+                      "present (1). The summary is the average of these scores."),
+        ]),
+    ]
+    return _map_page_shell(pathname, sidebar, "piiag-map", "piiag-legend", "piiag-popup")
 
-    tooltip_data = [
-        {
-            col: {"value": str(row.get(col, "")), "type": "markdown"}
-            for col in df.columns
-            if isinstance(row.get(col), str) and len(str(row.get(col, ""))) > 50
-        }
-        for row in records
+
+def pefa_layout(pathname):
+    sidebar = [
+        u.form_field("Region", u.styled_select("pefa-region", u.GLOBAL_REGIONS, u.GLOBAL_REGIONS[0])),
+        u.form_field("Indicator", u.styled_select("pefa-indicator", q.PEFA_INDICATORS, q.PEFA_INDICATORS[0])),
+        u.info_blocks_section([
+            ("About PEFA", "Public Expenditure and Financial Accountability (PEFA) framework assesses the "
+                            "strength of public financial management systems. Scores shown use the latest "
+                            "assessment per country."),
+            ("Indicators", "PI-11 — Public Investment Management. PI-11.3 — Project costing & budget "
+                            "alignment. PI-11.4 — Investment project monitoring. PI-12 — Public Asset "
+                            "Management. PI-16 — Medium-term fiscal perspective."),
+            ("Explore", "Select a region and indicator, then click a country to see all PI scores for "
+                        "that assessment."),
+        ]),
+    ]
+    return _map_page_shell(pathname, sidebar, "pefa-map", "pefa-legend", "pefa-popup")
+
+
+def ef_layout(pathname):
+    filters = q.ef_get_filters()
+    methods = filters["methods"]
+    samples = filters["samples"]
+
+    sidebar = [
+        u.info_blocks_section([
+            ("Data Visualization", "Based on the work of the Fiscal Policy Unit at the World Bank, the "
+                                    "infrastructure efficiency analysis uses eight output indicators "
+                                    "following the methodology developed by Herrera and Ouedraogo (2018) "
+                                    "and Herrera, Isaka, and Ouedraogo (2025)"),
+            ("Data Overview", "The eight Indicators considered are Quality of overall infrastructure, "
+                               "Transport infrastructure, roads, port infrastructure, air transport, "
+                               "railroads, electricity supply, and the country scores on the World Bank's "
+                               "Logistics Performance Index."),
+            ("Explore", "Use the drop-down menu to focus on a country and click on the country to see the "
+                        "graph. Maximum of 5 countries can be selected."),
+            ("Notes", "Public investment per capita is treated as an input. Efficiency Scores focus on "
+                      "technical efficiency based on non-parametric methods of Conditional DEA, Conditional "
+                      "FDH, Bootstrapped DEA and Bootstrapped FDH and parametric method of Stochastic "
+                      "frontier analysis."),
+        ]),
     ]
 
-    return records, cols, tooltip_data
+    main = html.Main(
+        className="ef-main",
+        children=[
+            html.H1("Infrastructure Efficiency Dashboard", className="ef-title"),
+            html.Div(
+                className="ef-controls-row",
+                children=[
+                    u.form_field("Method", u.styled_select("ef-method", methods, methods[0] if methods else None)),
+                    html.Div(
+                        className="ef-country-field",
+                        children=[
+                            html.Label("Country (ISO) — max 5", className="field-label"),
+                            html.Div(id="ef-country-badges", className="ef-badges"),
+                            u.form_field("", u.styled_select("ef-country-add", [], None, placeholder="Select a country...")),
+                        ],
+                    ),
+                    u.form_field("Sample", u.styled_select("ef-sample", samples, samples[0] if samples else None)),
+                ],
+            ),
+            html.Div(
+                className="ef-chart-block",
+                children=[
+                    html.H2("Frontier Line Graph", className="ef-h2"),
+                    html.P("Infrastructure Efficiency Frontier (DEA & FDH)", className="ef-sub"),
+                    dcc.Graph(id="ef-frontier-graph", config={"displayModeBar": False}, figure=go.Figure()),
+                ],
+            ),
+            html.Div(id="ef-bar-block"),
+            dcc.Store(id="ef-selected-countries", data=[]),
+        ],
+    )
+
+    return html.Div(
+        className="page-shell",
+        children=[
+            u.build_header(pathname),
+            html.Div(className="body-shell", children=[u.build_sub_nav_sidebar(sidebar), main]),
+        ],
+    )
 
 
-# ── 5. Export CSV ──────────────────────────────────────────────────────────────
+def not_found_layout(pathname):
+    return html.Div(
+        className="page-shell",
+        children=[
+            u.build_header(pathname),
+            html.Div(
+                className="body-shell",
+                children=html.Main(
+                    className="intro-main",
+                    children=html.Div(
+                        className="intro-content",
+                        children=[
+                            html.H1("404 - Page Not Found", className="intro-title"),
+                            html.P("The page you're looking for doesn't exist.", className="intro-desc"),
+                            dcc.Link("← Back to Overview", href="/", className="back-link"),
+                        ],
+                    ),
+                ),
+            ),
+        ],
+    )
+
+
+PAGE_BUILDERS = {
+    "/": introduction_layout,
+    "/gccii": gccii_layout,
+    "/gtmi": gtmi_layout,
+    "/ef": ef_layout,
+    "/ccia": ccia_layout,
+    "/infra": infra_layout,
+    "/piiag": piiag_layout,
+    "/pefa": pefa_layout,
+}
+
+# ══════════════════════════════════════════════════════════════════════════
+# App shell / routing
+# ══════════════════════════════════════════════════════════════════════════
+
+app.layout = html.Div([
+    dcc.Location(id="url", refresh=False),
+    html.Div(id="page-content"),
+])
+
+
+@app.callback(Output("page-content", "children"), Input("url", "pathname"))
+def render_page(pathname):
+    builder = PAGE_BUILDERS.get(pathname, not_found_layout)
+    return builder(pathname)
+
+
+app.clientside_callback(
+    """
+    function(pathname) {
+        const titles = """ + json.dumps(u.PAGE_TITLES) + """;
+        const base = """ + json.dumps(u.BASE_TITLE) + """;
+        const subtitle = titles[pathname];
+        document.title = subtitle ? (base + " - " + subtitle) : base;
+        return "";
+    }
+    """,
+    Output("page-content", "title"),
+    Input("url", "pathname"),
+)
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# Generic map-page callback factory
+# ══════════════════════════════════════════════════════════════════════════
+
+def register_simple_map_page(map_id, legend_id, region_dropdown_id, data_fn, colors, mode,
+                               legend_title, legend_labels, vmin=None, vmax=None, extra_dropdown_id=None):
+    """
+    Wires up a region-only (or region+one-more-dropdown) map page:
+      Inputs  -> region dropdown value [+ extra dropdown value]
+      Outputs -> map figure, legend content
+    `data_fn(region)` or `data_fn(region, extra_value)` must return the
+    country_data list of {"cntrCode","score","tooltip","popupRows"} dicts.
+    """
+    inputs = [Input(region_dropdown_id, "value")]
+    if extra_dropdown_id:
+        inputs.append(Input(extra_dropdown_id, "value"))
+
+    def _callback(region, extra=None):
+        if extra is not None:
+            country_data = data_fn(region, extra)
+        else:
+            country_data = data_fn(region)
+        fig = u.build_map_figure(country_data, region, colors, mode=mode, vmin=vmin, vmax=vmax)
+        legend = u.build_legend(legend_title, legend_labels, colors)
+        return fig, legend
+
+    app.callback(
+        Output(map_id, "figure"),
+        Output(legend_id, "children"),
+        *inputs,
+    )(_callback)
+
+
+def register_popup_callback_simple(map_id, popup_id, reset_inputs):
+    """
+    Wires up the click-to-show / X-to-close popup panel.
+    `reset_inputs` is a list of Input(...) for the page's filter dropdowns -
+    changing any of them clears the currently open popup (since it belongs to
+    the previous filter state).
+    """
+    def _callback(click_data, _close_clicks, *_filters):
+        triggered = ctx.triggered_id
+        if triggered == "map-popup-close":
+            return u.build_popup_panel(visible=False)
+        if triggered == map_id and click_data and click_data.get("points"):
+            point = click_data["points"][0]
+            customdata = point.get("customdata")
+            if not customdata:
+                return u.build_popup_panel(visible=False)
+            country_code, _tooltip, popup_json = customdata
+            rows = json.loads(popup_json)
+            if not rows:
+                return u.build_popup_panel(visible=False)
+            name = q.get_country_name_map().get(country_code, country_code)
+            return u.build_popup_panel(country_name=name, rows=rows, visible=True)
+        # filters changed (or initial load) -> hide any stale popup
+        return u.build_popup_panel(visible=False)
+
+    app.callback(
+        Output(popup_id, "children"),
+        Input(map_id, "clickData"),
+        Input("map-popup-close", "n_clicks"),
+        *reset_inputs,
+        prevent_initial_call=False,
+    )(_callback)
+
+
+# ── GCCII ──────────────────────────────────────────────────────────────────
+
+register_simple_map_page(
+    "gccii-map", "gccii-legend", "gccii-region",
+    data_fn=q.gccii_country_data,
+    colors=u.HEX_CODES_5, mode="heatmap",
+    legend_title="Average GCCII Score",
+    legend_labels=["Low", "Med-Low", "Medium", "Med-High", "High"],
+    vmin=0, vmax=1,
+)
+register_popup_callback_simple("gccii-map", "gccii-popup", [Input("gccii-region", "value")])
+
+
+# ── GTMI ───────────────────────────────────────────────────────────────────
+
+def _gtmi_data(region, pillar):
+    return q.gtmi_country_data(region, pillar)
+
 
 @app.callback(
-    Output("download-csv",  "data"),
-    Input("btn-export-csv", "n_clicks"),
-    State("store-download", "data"),
-    prevent_initial_call=True,
+    Output("gtmi-map", "figure"),
+    Output("gtmi-legend", "children"),
+    Input("gtmi-region", "value"),
+    Input("gtmi-pillar", "value"),
 )
-def export_csv(n_clicks, records):
-    if not records:
+def _update_gtmi(region, pillar):
+    country_data = _gtmi_data(region, pillar)
+    is_pims = pillar == "PIMS"
+    if is_pims:
+        fig = u.build_map_figure(country_data, region, u.HEX_CODES_3, mode="categorical")
+        legend = u.build_legend(
+            "PIMS Implementation Status",
+            ["Not yet implemented", "PIMS under implementation", "PIMS Implemented"],
+            u.HEX_CODES_3,
+        )
+    else:
+        fig = u.build_map_figure(country_data, region, u.HEX_CODES_5, mode="heatmap", vmin=0, vmax=1)
+        legend = u.build_legend(
+            "Average GovTech Score",
+            ["Low", "Med-Low", "Medium", "Med-High", "High"],
+            u.HEX_CODES_5,
+        )
+    return fig, legend
+
+
+register_popup_callback_simple("gtmi-map", "gtmi-popup", [Input("gtmi-region", "value"), Input("gtmi-pillar", "value")])
+
+
+# ── CCIA ───────────────────────────────────────────────────────────────────
+
+register_simple_map_page(
+    "ccia-map", "ccia-legend", "ccia-region",
+    data_fn=q.ccia_country_data,
+    colors=u.HEX_CODES_5, mode="heatmap",
+    legend_title="Average CCIA Score",
+    legend_labels=["Low", "Med-Low", "Medium", "Med-High", "High"],
+    vmin=1, vmax=6,
+    extra_dropdown_id="ccia-pillar",
+)
+register_popup_callback_simple("ccia-map", "ccia-popup", [Input("ccia-region", "value"), Input("ccia-pillar", "value")])
+
+
+# ── Infra ──────────────────────────────────────────────────────────────────
+
+register_simple_map_page(
+    "infra-map", "infra-legend", "infra-region",
+    data_fn=q.infra_country_data,
+    colors=u.HEX_CODES_5, mode="heatmap",
+    legend_title="Infrastructure Gap Index",
+    legend_labels=["Low", "Med-Low", "Medium", "Med-High", "High"],
+    vmin=None, vmax=None,
+)
+register_popup_callback_simple("infra-map", "infra-popup", [Input("infra-region", "value")])
+
+
+# ── PIIAG ──────────────────────────────────────────────────────────────────
+
+register_simple_map_page(
+    "piiag-map", "piiag-legend", "piiag-region",
+    data_fn=q.piiag_country_data,
+    colors=u.HEX_CODES_5, mode="heatmap",
+    legend_title="Average PIIAG Score",
+    legend_labels=["Low", "Med-Low", "Medium", "Med-High", "High"],
+    vmin=1, vmax=6,
+    extra_dropdown_id="piiag-section",
+)
+register_popup_callback_simple("piiag-map", "piiag-popup", [Input("piiag-region", "value"), Input("piiag-section", "value")])
+
+
+# ── PEFA ───────────────────────────────────────────────────────────────────
+
+GRADE_COLORS = [q.SCORE_COLOR_MAP[g] for g in q.GRADE_ORDER]
+
+
+@app.callback(
+    Output("pefa-map", "figure"),
+    Output("pefa-legend", "children"),
+    Input("pefa-region", "value"),
+    Input("pefa-indicator", "value"),
+)
+def _update_pefa(region, indicator):
+    country_data = q.pefa_country_data(indicator=indicator, framework="Annex 2011")
+    fig = u.build_map_figure(country_data, region, GRADE_COLORS, mode="categorical")
+    legend = u.build_legend(f"PEFA {indicator} Score", q.GRADE_ORDER, GRADE_COLORS)
+    return fig, legend
+
+
+register_popup_callback_simple("pefa-map", "pefa-popup", [Input("pefa-region", "value"), Input("pefa-indicator", "value")])
+
+
+# ══════════════════════════════════════════════════════════════════════════
+# EF (Infrastructure Efficiency) page callbacks
+# ══════════════════════════════════════════════════════════════════════════
+
+def _frontier_y(x, frontier):
+    if not frontier:
         return None
-    df = pd.DataFrame(records)
-    return dcc.send_data_frame(df.to_csv, "goat_projects.csv", index=False)
+    pts = sorted(frontier, key=lambda p: p["x"])
+    if x <= pts[0]["x"]:
+        return pts[0]["y"]
+    if x >= pts[-1]["x"]:
+        return pts[-1]["y"]
+    for i in range(len(pts) - 1):
+        if pts[i]["x"] <= x <= pts[i + 1]["x"]:
+            span = pts[i + 1]["x"] - pts[i]["x"]
+            t = (x - pts[i]["x"]) / span if span else 0
+            return pts[i]["y"] + t * (pts[i + 1]["y"] - pts[i]["y"])
+    return None
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# Callbacks — Keywords tab
-# ═══════════════════════════════════════════════════════════════════════════════
+def _build_frontier_figure(selected_countries):
+    frontier = q.ef_get_frontier()
+    names = q.get_country_name_map()
+    dea, fdh, scatter = frontier["dea"], frontier["fdh"], frontier["scatter"]
 
-# ── 6a. Load sunburst when Keywords tab is active ──────────────────────────────
+    fig = go.Figure()
+
+    other = [p for p in scatter if p["iso"] not in selected_countries]
+    fig.add_trace(go.Scatter(
+        x=[p["x"] for p in other], y=[p["y"] for p in other],
+        mode="markers", name="Other",
+        marker=dict(color="#cccccc", size=8, opacity=0.6),
+        customdata=[[p["iso"], names.get(p["iso"], p["iso"])] for p in other],
+        hovertemplate="<b>%{customdata[1]}</b><br>Input: %{x:.3f}<br>Output: %{y:.3f}<extra></extra>",
+    ))
+
+    for i, iso in enumerate(selected_countries):
+        pts = [p for p in scatter if p["iso"] == iso]
+        color = u.COUNTRY_COLORS[i % len(u.COUNTRY_COLORS)]
+        fig.add_trace(go.Scatter(
+            x=[p["x"] for p in pts], y=[p["y"] for p in pts],
+            mode="markers", name=iso, showlegend=False,
+            marker=dict(color=color, size=11, line=dict(width=1, color="#1f2937")),
+            customdata=[[p["iso"], names.get(p["iso"], p["iso"])] for p in pts],
+            hovertemplate="<b>%{customdata[1]}</b><br>Input: %{x:.3f}<br>Output: %{y:.3f}<extra></extra>",
+        ))
+
+    if dea:
+        dea_sorted = sorted(dea, key=lambda p: p["x"])
+        fig.add_trace(go.Scatter(
+            x=[p["x"] for p in dea_sorted], y=[p["y"] for p in dea_sorted],
+            mode="lines", name="DEA (VRS) frontier",
+            line=dict(color="#2ca02c", width=2),
+        ))
+    if fdh:
+        fdh_sorted = sorted(fdh, key=lambda p: p["x"])
+        fig.add_trace(go.Scatter(
+            x=[p["x"] for p in fdh_sorted], y=[p["y"] for p in fdh_sorted],
+            mode="lines", name="FDH frontier",
+            line=dict(color="#1f77b4", width=2, dash="dash"),
+        ))
+
+    fig.update_layout(
+        height=460,
+        margin=dict(l=70, r=20, t=40, b=60),
+        xaxis=dict(title="Public Investment per Capita (Log)", gridcolor="#f0f0f0"),
+        yaxis=dict(title="Global Quality Infrastructure Index", gridcolor="#f0f0f0"),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+        hoverlabel=dict(bgcolor="white", font_size=12, font_family="Inter, sans-serif"),
+    )
+    return fig
+
+
+def _build_bar_figure(selected_countries, method, sample):
+    if not selected_countries:
+        return None
+    df = q.ef_get_scores(method=method, sample=sample, isos=selected_countries)
+    if df.empty:
+        return None
+
+    by_var = {}
+    for _, row in df.iterrows():
+        short_name = row["short_name"] or row.get("varname", "")
+        by_var.setdefault(short_name, {})[row["ISO"]] = row["score"]
+
+    def sort_key(name):
+        try:
+            return EF_CUSTOM_ORDER.index(name)
+        except ValueError:
+            return 999
+
+    names_sorted = sorted(by_var.keys(), key=sort_key)
+
+    fig = go.Figure()
+    for i, iso in enumerate(selected_countries):
+        color = u.COUNTRY_COLORS[i % len(u.COUNTRY_COLORS)]
+        y_vals = [by_var[n].get(iso) for n in names_sorted]
+        fig.add_trace(go.Bar(x=names_sorted, y=y_vals, name=iso, marker_color=color))
+
+    fig.update_layout(
+        height=480,
+        margin=dict(l=55, r=20, t=40, b=90),
+        yaxis=dict(title="Infrastructure Score", gridcolor="#f0f0f0"),
+        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="left", x=0),
+        barmode="group",
+        plot_bgcolor="white",
+        paper_bgcolor="white",
+    )
+    return fig
+
 
 @app.callback(
-    Output("chart-hierarchy-sunburst", "figure"),
-    Input("main-tabs",       "value"),
-    Input("kw-sub-tabs",     "value"),
-    Input("store-kw-refresh","data"),
-    prevent_initial_call=False,
-)
-def load_sunburst(main_tab, kw_sub_tab, _refresh):
-    """
-    Fetch the hierarchy table and render the sunburst chart.
-    Fires when:
-      • the main Keywords tab is selected, OR
-      • the Available Hierarchies sub-tab is selected, OR
-      • store-kw-refresh increments (after add/delete operations).
-    """
-    if main_tab != "keywords":
-        return no_update
-
-    try:
-        df  = qs.get_hierarchy_table()
-        fig = build_hierarchy_sunburst(df)
-        return fig
-    except Exception as exc:
-        logger.error("[GoAT] load_sunburst error: %s", exc)
-        return build_empty_chart(f"Failed to load hierarchy data: {exc}")
-
-
-# ── 6b. Load delete dropdown when Keywords tab is active ──────────────────────
-
-@app.callback(
-    Output("dd-delete-hierarchy", "options"),
-    Output("dd-delete-hierarchy", "value"),
-    Input("main-tabs",        "value"),
-    Input("store-kw-refresh", "data"),
-    prevent_initial_call=False,
-)
-def load_delete_dropdown(main_tab, _refresh):
-    """Populate the Delete Hierarchy dropdown with currently valid hierarchy names."""
-    if main_tab != "keywords":
-        return no_update, no_update
-
-    try:
-        names = qs.get_valid_hierarchy_names()
-        opts  = [{"label": n, "value": n} for n in names]
-        return opts, None
-    except Exception as exc:
-        logger.error("[GoAT] load_delete_dropdown error: %s", exc)
-        return [], None
-
-
-# ── 7. Add New Keyword ─────────────────────────────────────────────────────────
-
-@app.callback(
-    Output("add-kw-feedback",  "children"),
-    Output("store-kw-refresh", "data", allow_duplicate=True),
-    Output("input-hier-name",     "value"),
-    Output("input-hier-fullname", "value"),
-    Output("input-hier-keywords", "value"),
-    Input("btn-add-keyword",   "n_clicks"),
-    State("input-hier-name",      "value"),
-    State("input-hier-fullname",  "value"),
-    State("input-hier-keywords",  "value"),
-    State("store-kw-refresh",     "data"),
+    Output("ef-selected-countries", "data"),
+    Output("ef-country-add", "value"),
+    Input("ef-country-add", "value"),
+    Input({"type": "ef-remove", "iso": ALL}, "n_clicks"),
+    State("ef-selected-countries", "data"),
     prevent_initial_call=True,
 )
-def add_keyword(n_clicks, hier_name, full_name, keywords_csv, refresh_count):
-    """
-    Run vectorised keyword search over all projects, then INSERT new rows
-    into the UC table with Valid_Hierarchy = 'True'.
-    Clears form inputs on success and bumps store-kw-refresh to reload charts.
-    """
-    # ── Validate presence of inputs ────────────────────────────────────────────
-    hier_name    = (hier_name    or "").strip()
-    full_name    = (full_name    or "").strip()
-    keywords_csv = (keywords_csv or "").strip()
+def _update_selected_countries(added_iso, _remove_clicks, current):
+    current = current or []
+    triggered = ctx.triggered_id
 
-    if not hier_name or not full_name or not keywords_csv:
-        feedback = html.Div(
-            [html.I(className="bi bi-exclamation-circle me-2"), "All fields are required."],
-            style=_ALERT_ERROR,
-        )
-        return feedback, no_update, no_update, no_update, no_update
+    if triggered == "ef-country-add":
+        if added_iso and added_iso not in current and len(current) < 5:
+            current = current + [added_iso]
+        return current, None
 
-    try:
-        success, message = qs.add_new_hierarchy(hier_name, full_name, keywords_csv)
+    if isinstance(triggered, dict) and triggered.get("type") == "ef-remove":
+        iso = triggered.get("iso")
+        current = [c for c in current if c != iso]
+        return current, None
 
-        if success:
-            feedback = html.Div(
-                [html.I(className="bi bi-check-circle me-2"), message],
-                style=_ALERT_SUCCESS,
-            )
-            new_refresh = (refresh_count or 0) + 1
-            # Clear inputs on success
-            return feedback, new_refresh, "", "", ""
-        else:
-            feedback = html.Div(
-                [html.I(className="bi bi-exclamation-circle me-2"), message],
-                style=_ALERT_ERROR,
-            )
-            return feedback, no_update, no_update, no_update, no_update
+    return current, None
 
-    except Exception as exc:
-        logger.exception("[GoAT] add_keyword callback error: %s", exc)
-        feedback = html.Div(
-            [html.I(className="bi bi-exclamation-circle me-2"), f"Unexpected error: {exc}"],
-            style=_ALERT_ERROR,
-        )
-        return feedback, no_update, no_update, no_update, no_update
-
-
-# ── 8. Delete Hierarchy ────────────────────────────────────────────────────────
 
 @app.callback(
-    Output("delete-hier-feedback", "children"),
-    Output("store-kw-refresh",     "data", allow_duplicate=True),
-    Input("btn-delete-hierarchy",  "n_clicks"),
-    State("dd-delete-hierarchy",   "value"),
-    State("store-kw-refresh",      "data"),
-    prevent_initial_call=True,
+    Output("ef-country-badges", "children"),
+    Output("ef-country-add", "options"),
+    Input("ef-selected-countries", "data"),
 )
-def delete_hierarchy_callback(n_clicks, hierarchy_name, refresh_count):
-    """
-    Soft-delete: set Valid_Hierarchy = 'False' for the selected hierarchy.
-    Bumps store-kw-refresh so the sunburst and delete dropdown reload.
-    """
-    if not hierarchy_name:
-        feedback = html.Div(
-            [html.I(className="bi bi-exclamation-circle me-2"), "Please select a hierarchy to delete."],
-            style=_ALERT_ERROR,
-        )
-        return feedback, no_update
+def _render_badges(selected):
+    selected = selected or []
+    filters = q.ef_get_filters()
+    all_countries = filters["countries"]
 
-    try:
-        success, message = qs.delete_hierarchy(hierarchy_name)
-
-        if success:
-            feedback = html.Div(
-                [html.I(className="bi bi-check-circle me-2"), message],
-                style=_ALERT_SUCCESS,
+    badges = []
+    for i, iso in enumerate(selected):
+        color = u.COUNTRY_COLORS[i % len(u.COUNTRY_COLORS)]
+        badges.append(
+            html.Span(
+                [iso, html.Button("\u00d7", id={"type": "ef-remove", "iso": iso}, className="badge-remove", n_clicks=0)],
+                className="country-badge",
+                style={"backgroundColor": color},
             )
-            new_refresh = (refresh_count or 0) + 1
-            return feedback, new_refresh
-        else:
-            feedback = html.Div(
-                [html.I(className="bi bi-exclamation-circle me-2"), message],
-                style=_ALERT_ERROR,
-            )
-            return feedback, no_update
-
-    except Exception as exc:
-        logger.exception("[GoAT] delete_hierarchy callback error: %s", exc)
-        feedback = html.Div(
-            [html.I(className="bi bi-exclamation-circle me-2"), f"Unexpected error: {exc}"],
-            style=_ALERT_ERROR,
         )
-        return feedback, no_update
+
+    remaining = [c for c in all_countries if c not in selected]
+    options = [{"label": c, "value": c} for c in remaining]
+    return badges, options
 
 
-# ═══════════════════════════════════════════════════════════════════════════════
-# Entry point
-# ═══════════════════════════════════════════════════════════════════════════════
+@app.callback(
+    Output("ef-frontier-graph", "figure"),
+    Input("ef-selected-countries", "data"),
+)
+def _update_frontier(selected):
+    return _build_frontier_figure(selected or [])
+
+
+@app.callback(
+    Output("ef-bar-block", "children"),
+    Input("ef-selected-countries", "data"),
+    Input("ef-method", "value"),
+    Input("ef-sample", "value"),
+)
+def _update_bar_block(selected, method, sample):
+    selected = selected or []
+    if not selected:
+        return None
+    fig = _build_bar_figure(selected, method, sample)
+    if fig is None:
+        return None
+    return [
+        html.H2(f"Data Components by Variable: {method} | {sample}", className="ef-h2"),
+        dcc.Graph(figure=fig, config={"displayModeBar": False}),
+    ]
+
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=8050)
-
-
-#Working well now
+    app.run(debug=False, host="127.0.0.1", port=8050)
