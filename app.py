@@ -165,7 +165,7 @@ def introduction_layout(current_page):
         children=html.Div(
             className="intro-content",
             children=[
-                html.Img(src=HERO_BANNER_URL, className="intro-hero-banner", alt="PFM4CA Country Benchmarking Tool"),
+                # html.Img(src=HERO_BANNER_URL, className="intro-hero-banner", alt="PFM4CA Country Benchmarking Tool"),
                 html.H1("PFM4CA Country Benchmarking Tool", className="intro-title"),
                 html.P(
                     "The Country Benchmarking Tool (CBT) helps visualize PFM4CA performance across a "
