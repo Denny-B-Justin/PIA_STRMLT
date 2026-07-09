@@ -4,8 +4,12 @@ queries.py
 All data access for the PFM4CA Country Benchmarking Tool.
 
 Every table that used to be a CSV in ./data now lives in Databricks Unity
-Catalog, prefixed "cbd_" (e.g. ccia_score.csv -> cbd_ccia_score). The only
-thing still read from disk is world_countries.geojson.
+Catalog, prefixed "cbd_" (e.g. ccia_score.csv -> cbd_ccia_score).
+
+world_countries.geojson now lives in /assets and is served as a static file
+via app.get_asset_url() (see app.py) - Plotly's Choroplethmapbox accepts a
+geojson URL directly and fetches it client-side, so this module no longer
+reads or parses it from disk at all.
 
 This file keeps the exact same public surface as the CSV version -
 load_csv(name) still takes the old CSV basename (no prefix, no extension)
@@ -15,7 +19,6 @@ Only load_csv()'s internals changed: file read -> Databricks SQL query.
 """
 
 import os
-import json
 import logging
 from functools import lru_cache
 from typing import Optional
@@ -35,12 +38,6 @@ try:
 except ImportError:
     logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(name)s - %(levelname)s - %(message)s")
     logging.warning("python-dotenv not installed — reading env vars from system only")
-
-# ── Paths (geojson only - every CSV table now lives in Databricks) ────────────
-
-BASE_DIR = os.path.abspath(os.path.dirname(__file__))
-DATA_DIR = os.path.join(BASE_DIR)
-GEOJSON_PATH = os.path.join(DATA_DIR, "world_countries.geojson")
 
 # ── Databricks connection config ───────────────────────────────────────────────
 # CBD_CATALOG / CBD_SCHEMA point at the Unity Catalog catalog.schema that holds
@@ -122,22 +119,14 @@ def load_csv(name: str) -> pd.DataFrame:
 
 def refresh_all_tables() -> None:
     """
-    Clear the in-process table cache so the next load_csv()/load_world_geojson()
-    call re-queries Databricks / re-reads the geojson. Wire this up to an admin
-    route or a scheduled job if the underlying tables get updated via ETL while
-    the app is running (the old CSV version never needed this, since the files
-    genuinely never changed mid-process).
+    Clear the in-process table cache so the next load_csv() call re-queries
+    Databricks. Wire this up to an admin route or a scheduled job if the
+    underlying tables get updated via ETL while the app is running (the old
+    CSV version never needed this, since the files genuinely never changed
+    mid-process).
     """
     load_csv.cache_clear()
-    load_world_geojson.cache_clear()
-    logging.info("Cleared table + geojson cache")
-
-
-@lru_cache(maxsize=None)
-def load_world_geojson() -> dict:
-    """Country boundary polygons (ISO A3 coded) used for every choropleth map."""
-    with open(GEOJSON_PATH, "r") as f:
-        return json.load(f)
+    logging.info("Cleared table cache")
 
 
 # ── Reference data ────────────────────────────────────────────────────────────

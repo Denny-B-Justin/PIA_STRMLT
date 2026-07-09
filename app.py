@@ -36,9 +36,43 @@ server = app.server
 # hand the resulting URLs down into the layout builders.
 
 LOGO_WHITE_URL = app.get_asset_url("cbd_logo_white.png")
+
 # Placeholder - swap in the real filename once the hero image is added to
 # /assets. Used by introduction_layout() below for the front-page banner.
 HERO_BANNER_URL = app.get_asset_url("cbd_hero_banner.png")
+
+FAVICON_URL = app.get_asset_url("favicon.ico")
+
+# world_countries.geojson lives in /assets - resolved once here and passed
+# as a URL into every u.build_map_figure(...) call. Plotly fetches it
+# client-side, so no server-side file read/parse is needed at all.
+GEOJSON_URL = app.get_asset_url("world_countries.geojson")
+# GEOJSON_URL = app.get_asset_url("world_bank_boundries.geojson")
+
+# Dash normally auto-detects an /assets/favicon.ico on its own via the
+# {%favicon%} template token, but we override index_string explicitly here
+# so the favicon goes through the same app.get_asset_url() resolution as
+# the logo/hero images above - consistent, and correct if the file is ever
+# renamed or the app moves to a different assets path.
+app.index_string = """
+<!DOCTYPE html>
+<html>
+    <head>
+        {%metas%}
+        <title>{%title%}</title>
+        <link rel="icon" type="image/x-icon" href=\"""" + FAVICON_URL + """\">
+        {%css%}
+    </head>
+    <body>
+        {%app_entry%}
+        <footer>
+            {%config%}
+            {%scripts%}
+            {%renderer%}
+        </footer>
+    </body>
+</html>
+"""
 
 # ══════════════════════════════════════════════════════════════════════════
 # Static content
@@ -131,7 +165,7 @@ def introduction_layout(current_page):
         children=html.Div(
             className="intro-content",
             children=[
-                # html.Img(className="intro-hero-banner", alt="PFM4CA Country Benchmarking Tool"),
+                html.Img(src=HERO_BANNER_URL, className="intro-hero-banner", alt="PFM4CA Country Benchmarking Tool"),
                 html.H1("PFM4CA Country Benchmarking Tool", className="intro-title"),
                 html.P(
                     "The Country Benchmarking Tool (CBT) helps visualize PFM4CA performance across a "
@@ -467,7 +501,7 @@ def register_simple_map_page(map_id, legend_id, region_dropdown_id, data_fn, col
             country_data = data_fn(region, extra)
         else:
             country_data = data_fn(region)
-        fig = u.build_map_figure(country_data, region, colors, mode=mode, vmin=vmin, vmax=vmax)
+        fig = u.build_map_figure(country_data, region, colors, GEOJSON_URL, mode=mode, vmin=vmin, vmax=vmax)
         legend = u.build_legend(legend_title, legend_labels, colors)
         return fig, legend
 
@@ -541,14 +575,14 @@ def _update_gtmi(region, pillar):
     country_data = _gtmi_data(region, pillar)
     is_pims = pillar == "PIMS"
     if is_pims:
-        fig = u.build_map_figure(country_data, region, u.HEX_CODES_3, mode="categorical")
+        fig = u.build_map_figure(country_data, region, u.HEX_CODES_3, GEOJSON_URL, mode="categorical")
         legend = u.build_legend(
             "PIMS Implementation Status",
             ["Not yet implemented", "PIMS under implementation", "PIMS Implemented"],
             u.HEX_CODES_3,
         )
     else:
-        fig = u.build_map_figure(country_data, region, u.HEX_CODES_5, mode="heatmap", vmin=0, vmax=1)
+        fig = u.build_map_figure(country_data, region, u.HEX_CODES_5, GEOJSON_URL, mode="heatmap", vmin=0, vmax=1)
         legend = u.build_legend(
             "Average GovTech Score",
             ["Low", "Med-Low", "Medium", "Med-High", "High"],
@@ -614,7 +648,7 @@ GRADE_COLORS = [q.SCORE_COLOR_MAP[g] for g in q.GRADE_ORDER]
 )
 def _update_pefa(region, indicator):
     country_data = q.pefa_country_data(indicator=indicator, framework="Annex 2011")
-    fig = u.build_map_figure(country_data, region, GRADE_COLORS, mode="categorical")
+    fig = u.build_map_figure(country_data, region, GRADE_COLORS, GEOJSON_URL, mode="categorical")
     legend = u.build_legend(f"PEFA {indicator} Score", q.GRADE_ORDER, GRADE_COLORS)
     return fig, legend
 

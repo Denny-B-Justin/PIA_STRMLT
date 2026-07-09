@@ -16,8 +16,6 @@ import os
 
 from dash import html, dcc
 
-import queries as q
-
 # ── Brand / layout constants ─────────────────────────────────────────────────
 
 HEADER_BG = "#021420"
@@ -143,9 +141,15 @@ def _discrete_colorscale(colors):
 
 # ── Figure builder ────────────────────────────────────────────────────────────
 
-def build_map_figure(country_data, region, colors, mode="heatmap", vmin=None, vmax=None):
+def build_map_figure(country_data, region, colors, geojson_url, mode="heatmap", vmin=None, vmax=None):
     """
     country_data: list of {"cntrCode", "score", "tooltip", "popupRows"} dicts
+    geojson_url: the world_countries.geojson asset URL (from app.get_asset_url()
+                 in app.py). Plotly's Choroplethmapbox accepts a geojson URL
+                 directly and fetches it client-side, so this function never
+                 opens or parses the file itself - utils.py has no Dash app
+                 instance to resolve asset paths with, the same reason
+                 build_header() takes logo_src instead of resolving it here.
     mode: "heatmap" (continuous, bucketed into 5 bands) or "categorical"
           (score is already a 0..len(colors)-1 index)
     vmin/vmax: for heatmap mode only. If omitted, computed from the data itself
@@ -153,7 +157,8 @@ def build_map_figure(country_data, region, colors, mode="heatmap", vmin=None, vm
     """
     import plotly.graph_objects as go
 
-    geojson = q.load_world_geojson()
+    if not geojson_url:
+        raise ValueError("build_map_figure() requires geojson_url (pass app.get_asset_url(...) from app.py)")
 
     if mode == "heatmap" and (vmin is None or vmax is None):
         valid = [d["score"] for d in country_data if d.get("score") is not None]
@@ -183,7 +188,7 @@ def build_map_figure(country_data, region, colors, mode="heatmap", vmin=None, vm
 
     fig = go.Figure(
         go.Choroplethmapbox(
-            geojson=geojson,
+            geojson=geojson_url,
             locations=locations,
             z=z,
             featureidkey="properties.iso_a3",
@@ -349,19 +354,19 @@ def build_header(current_page="", logo_src=None):
                 #     ),
                 # ],
             ),
-            # html.Div(
-            #     className="header-brand",
-            #     children=[
-            #         html.P("Part of", className="header-brand-sub"),
-            #         html.A(
-            #             "PIM-PAM.net",
-            #             href="https://pim-pam.net",
-            #             target="_blank",
-            #             rel="noopener noreferrer",
-            #             className="header-brand-link",
-            #         ),
-            #     ],
-            # ),
+            html.Div(
+                className="header-brand",
+                children=[
+                    html.P("Part of", className="header-brand-sub"),
+                    html.A(
+                        ".net",
+                        href="https://pim-pam.net",
+                        target="_blank",
+                        rel="noopener noreferrer",
+                        className="header-brand-link",
+                    ),
+                ],
+            ),
         ],
     )
 
