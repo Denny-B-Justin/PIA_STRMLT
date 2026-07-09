@@ -248,6 +248,37 @@ def build_legend(title, labels, colors, show_no_data=True):
 
 
 def build_popup_panel(country_name=None, rows=None, visible=False):
+# ── Legend / popup builders ───────────────────────────────────────────────────
+
+def build_legend(title, labels, colors, show_no_data=True):
+    swatches = []
+    for label, color in zip(labels, colors):
+        swatches.append(
+            html.Div(
+                className="legend-row",
+                children=[
+                    html.Div(className="legend-swatch", style={"backgroundColor": color}),
+                    html.Span(label),
+                ],
+            )
+        )
+    if show_no_data:
+        swatches.append(
+            html.Div(
+                className="legend-row",
+                children=[
+                    html.Div(className="legend-swatch", style={"backgroundColor": NO_DATA_COLOR}),
+                    html.Span("No data"),
+                ],
+            )
+        )
+    return html.Div(
+        className="map-legend",
+        children=[html.P(title, className="map-legend-title")] + swatches,
+    )
+
+
+def build_popup_panel(country_name=None, rows=None, visible=False):
     """
     Click-popup panel shown top-right of the map with per-indicator detail.
     The close button keeps a stable id and is always present in the DOM
@@ -320,7 +351,83 @@ NAV_SECTIONS = [
 
 
 def build_header(current_page="", logo_src=None):
+    Click-popup panel shown top-right of the map with per-indicator detail.
+    The close button keeps a stable id and is always present in the DOM
+    (only the outer wrapper's display is toggled) so the Dash callback that
+    listens on it never targets a missing component.
     """
+    rows = rows or []
+    body_rows = [
+        html.Tr([
+            html.Td(country_name or "", className="popup-td popup-td-country"),
+            html.Td(r.get("indicator", ""), className="popup-td"),
+            html.Td(
+                f"{r['score']:.2f}" if isinstance(r.get("score"), (int, float)) else str(r.get("score", "")),
+                className="popup-td popup-td-score",
+            ),
+        ])
+        for r in rows
+    ]
+
+    return html.Div(
+        className="map-popup",
+        style={"display": "flex" if (visible and country_name) else "none"},
+        children=[
+            html.Div(
+                className="map-popup-header",
+                children=[
+                    html.H3(country_name or "", className="map-popup-title"),
+                    html.Button("\u00d7", id="map-popup-close", className="map-popup-close", n_clicks=0),
+                ],
+            ),
+            html.Div(
+                className="map-popup-body",
+                children=html.Table(
+                    className="popup-table",
+                    children=[
+                        html.Thead(html.Tr([
+                            html.Th("Country", className="popup-th"),
+                            html.Th("Indicator", className="popup-th"),
+                            html.Th("Score", className="popup-th popup-th-right"),
+                        ])),
+                        html.Tbody(body_rows),
+                    ],
+                ),
+            ),
+        ],
+    )
+
+
+# ── Header / Nav sidebar ──────────────────────────────────────────────────────
+
+NAV_SECTIONS = [
+    {
+        "label": "Global Datasets",
+        "links": [
+            {"label": "Climate Change Institutional Indicators", "page": "gccii"},
+            {"label": "GovTech Maturity Index", "page": "gtmi"},
+            {"label": "Infra Efficiency", "page": "ef"},
+            {"label": "PEFA PI-11/12/16", "page": "pefa"},
+        ],
+    },
+    {
+        "label": "Local Datasets",
+        "links": [
+            {"label": "CCIA", "page": "ccia"},
+            {"label": "Infrastructure", "page": "infra"},
+            {"label": "PIIAG", "page": "piiag"},
+        ],
+    },
+]
+
+
+def build_header(current_page="", logo_src=None):
+    """
+    current_page: the page key parsed from ?page=... (empty string = home).
+    logo_src: the resolved asset URL for the header logo. This is computed
+    in app.py (via app.get_asset_url(...), where the `app` object actually
+    lives) and passed in here - utils.py has no Dash app instance of its
+    own, so it must never call app.get_asset_url() directly.
     current_page: the page key parsed from ?page=... (empty string = home).
     logo_src: the resolved asset URL for the header logo. This is computed
     in app.py (via app.get_asset_url(...), where the `app` object actually

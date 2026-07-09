@@ -11,6 +11,19 @@ styles (mapbox://styles/mapbox/light-v11), matching the original React app.
 Without a token, maps still render using the open "carto-positron" style.
 """
 
+"""
+app.py
+------
+PFM4CA Country Benchmarking Tool - Dash port.
+
+Run with:  python app.py
+Then open  http://127.0.0.1:8050
+
+Set the MAPBOX_TOKEN environment variable to use real Mapbox raster/vector
+styles (mapbox://styles/mapbox/light-v11), matching the original React app.
+Without a token, maps still render using the open "carto-positron" style.
+"""
+
 import json
 import warnings
 from urllib.parse import parse_qs
@@ -205,13 +218,229 @@ def _map_page_shell(current_page, sidebar_children, map_id, legend_id, popup_id)
                 ),
                 html.Div(id=legend_id),
                 html.Div(id=popup_id, children=u.build_popup_panel(visible=False)),
+                dcc.Graph(
+                    id=map_id,
+                    className="map-graph",
+                    style={"width": "100%", "height": "100%"},
+                    config={"displayModeBar": False, "scrollZoom": True},
+                    figure=go.Figure(),
+                ),
+                html.Div(id=legend_id),
+                html.Div(id=popup_id, children=u.build_popup_panel(visible=False)),
                 html.Div(
+                    className="map-loading-overlay",
+                    id=f"{map_id}-loading",
+                    style={"display": "none"},
                     className="map-loading-overlay",
                     id=f"{map_id}-loading",
                     style={"display": "none"},
                 ),
             ],
         ),
+    )
+    return html.Div(
+        className="page-shell",
+        children=[
+            u.build_header(current_page, LOGO_WHITE_URL),
+            html.Div(
+                className="body-shell",
+                children=[u.build_sub_nav_sidebar(sidebar_children), main],
+            ),
+        ],
+    )
+
+
+def gccii_layout(current_page):
+    sidebar = [
+        u.form_field("Region", u.styled_select("gccii-region", u.GLOBAL_REGIONS, u.GLOBAL_REGIONS[0])),
+        u.info_blocks_section([
+            ("Data Visualization", "Global Climate Change Institutional Indicators (GCCIIs), produced by "
+                                    "the Climate Governance Program of the Prosperity Vertical Institutions "
+                                    "Development"),
+            ("Data Overview", "The current draft dataset for 2024 covers 12 indicators for 182 countries"),
+            ("Explore", "Use the drop-down menu to focus on a World Bank Group Region, and click on the "
+                        "country to see the detailed indicators"),
+            ("Notes", "The indicators are quantified as 0 (no information/none), partial (0.5), and "
+                      "present (1). The summary is the average of these scores."),
+        ]),
+    ]
+    return _map_page_shell(current_page, sidebar, "gccii-map", "gccii-legend", "gccii-popup")
+
+
+def gtmi_layout(current_page):
+    sidebar = [
+        u.form_field("Region", u.styled_select("gtmi-region", u.GLOBAL_REGIONS, u.GLOBAL_REGIONS[0])),
+        u.form_field("Main Pillar", u.styled_select("gtmi-pillar", q.GTMI_PILLARS, "PIMS")),
+        u.info_blocks_section([
+            ("Data Visualization", "2022 Central Government (CG) GTMI survey data produced by the World "
+                                    "Bank Group"),
+            ("Data Overview", "The current draft dataset for 2024 covers 48 key indicators with 4 main "
+                               "groups for 198 countries"),
+            ("Explore", "Use the drop-down menu to focus on a World Bank Group Region, and click on the "
+                        "country to see the detailed indicators"),
+        ]),
+    ]
+    return _map_page_shell(current_page, sidebar, "gtmi-map", "gtmi-legend", "gtmi-popup")
+
+
+def ccia_layout(current_page):
+    pillars = ["Overall"] + q.ccia_pillars()
+    sidebar = [
+        u.form_field("Country Management Unit", u.styled_select("ccia-region", u.LOCAL_REGIONS, u.LOCAL_REGIONS[0])),
+        u.form_field("Pillar", u.styled_select("ccia-pillar", pillars, "Overall")),
+        u.info_blocks_section([
+            ("Data Visualization", "Climate Change Institutional Assessment (CCIA), produced by the "
+                                    "Climate Governance Program of the Prosperity Vertical Institutions "
+                                    "Development"),
+            ("Data Overview", "The current draft dataset for 2024 covers 74 indicators for 11 countries"),
+            ("Explore", "Use the drop-down menu to focus on a World Bank Group Country Management Unit, "
+                        "and click on the country to see the detailed indicators"),
+            ("Notes", "The indicators are quantified based on the scale of 1 to 6. The summary is the "
+                      "average of these scores."),
+        ]),
+    ]
+    return _map_page_shell(current_page, sidebar, "ccia-map", "ccia-legend", "ccia-popup")
+
+
+def infra_layout(current_page):
+    sidebar = [
+        u.form_field("Region", u.styled_select("infra-region", u.GLOBAL_REGIONS, u.GLOBAL_REGIONS[0])),
+        u.info_blocks_section([
+            ("Data Visualization", "Infrastructure Services Evaluation, produced by the Climate Governance "
+                                    "Program of the Prosperity Vertical Institutions Development"),
+            ("Data Overview", "The current draft dataset for 2019 covers 6 indicators for 220 countries"),
+            ("Notes", "The Infrastructure gap is done using the gap between countries' scores and regional "
+                      "average score of each indicator. Countries in which one or more scores are missing "
+                      "are exempted from the calculation and shown in gray."),
+        ]),
+    ]
+    return _map_page_shell(current_page, sidebar, "infra-map", "infra-legend", "infra-popup")
+
+
+def piiag_layout(current_page):
+    sections = ["Overall"] + q.piiag_sections()
+    sidebar = [
+        u.form_field("Country Management Unit", u.styled_select("piiag-region", u.LOCAL_REGIONS, u.LOCAL_REGIONS[0])),
+        u.form_field("Section", u.styled_select("piiag-section", sections, "Overall")),
+        u.info_blocks_section([
+            ("Data Visualization", "ECA Public Infrastructure Investment and Asset Governance Tracker (PIIAG)"),
+            ("Data Overview", "The current draft dataset for 2024 covers 29 indicators across 3 sections "
+                               "for 6 countries"),
+            ("Notes", "The indicators are quantified as 0 (no information/none), partial (0.5), and "
+                      "present (1). The summary is the average of these scores."),
+        ]),
+    ]
+    return _map_page_shell(current_page, sidebar, "piiag-map", "piiag-legend", "piiag-popup")
+
+
+def pefa_layout(current_page):
+    sidebar = [
+        u.form_field("Region", u.styled_select("pefa-region", u.GLOBAL_REGIONS, u.GLOBAL_REGIONS[0])),
+        u.form_field("Indicator", u.styled_select("pefa-indicator", q.PEFA_INDICATORS, q.PEFA_INDICATORS[0])),
+        u.info_blocks_section([
+            ("About PEFA", "Public Expenditure and Financial Accountability (PEFA) framework assesses the "
+                            "strength of public financial management systems. Scores shown use the latest "
+                            "assessment per country."),
+            ("Indicators", [
+                "PI-11 — Public Investment Management",
+                "PI-11.3 — Project costing & budget alignment",
+                "PI-11.4 — Investment project monitoring",
+                "PI-12 — Public Asset Management",
+                "PI-16 — Medium-term fiscal perspective",
+            ]),
+            ("Explore", "Select a region and indicator, then click a country to see all PI scores for "
+                        "that assessment."),
+        ]),
+    ]
+    return _map_page_shell(current_page, sidebar, "pefa-map", "pefa-legend", "pefa-popup")
+
+
+def ef_layout(current_page):
+    filters = q.ef_get_filters()
+    methods = filters["methods"]
+    samples = filters["samples"]
+
+    sidebar = [
+        u.info_blocks_section([
+            ("Data Visualization", "Based on the work of the Fiscal Policy Unit at the World Bank, the "
+                                    "infrastructure efficiency analysis uses eight output indicators "
+                                    "following the methodology developed by Herrera and Ouedraogo (2018) "
+                                    "and Herrera, Isaka, and Ouedraogo (2025)"),
+            ("Data Overview", "The eight Indicators considered are Quality of overall infrastructure, "
+                               "Transport infrastructure, roads, port infrastructure, air transport, "
+                               "railroads, electricity supply, and the country scores on the World Bank's "
+                               "Logistics Performance Index."),
+            ("Explore", "Use the drop-down menu to focus on a country and click on the country to see the "
+                        "graph. Maximum of 5 countries can be selected."),
+            ("Notes", "Public investment per capita is treated as an input. Efficiency Scores focus on "
+                      "technical efficiency based on non-parametric methods of Conditional DEA, Conditional "
+                      "FDH, Bootstrapped DEA and Bootstrapped FDH and parametric method of Stochastic "
+                      "frontier analysis."),
+        ]),
+    ]
+
+    main = html.Main(
+        className="ef-main",
+        children=[
+            html.H1("Infrastructure Efficiency Dashboard", className="ef-title"),
+            html.Div(
+                className="ef-controls-row",
+                children=[
+                    u.form_field("Method", u.styled_select("ef-method", methods, methods[0] if methods else None)),
+                    html.Div(
+                        className="ef-country-field",
+                        children=[
+                            html.Label("Country (ISO) — max 5", className="field-label"),
+                            html.Div(id="ef-country-badges", className="ef-badges"),
+                            u.form_field("", u.styled_select("ef-country-add", [], None, placeholder="Select a country...")),
+                        ],
+                    ),
+                    u.form_field("Sample", u.styled_select("ef-sample", samples, samples[0] if samples else None)),
+                ],
+            ),
+            html.Div(
+                className="ef-chart-block",
+                children=[
+                    html.H2("Frontier Line Graph", className="ef-h2"),
+                    html.P("Infrastructure Efficiency Frontier (DEA & FDH)", className="ef-sub"),
+                    dcc.Graph(id="ef-frontier-graph", config={"displayModeBar": False}, figure=go.Figure()),
+                ],
+            ),
+            html.Div(id="ef-bar-block"),
+            dcc.Store(id="ef-selected-countries", data=[]),
+        ],
+    )
+
+    return html.Div(
+        className="page-shell",
+        children=[
+            u.build_header(current_page, LOGO_WHITE_URL),
+            html.Div(className="body-shell", children=[u.build_sub_nav_sidebar(sidebar), main]),
+        ],
+    )
+
+
+def not_found_layout(current_page):
+    return html.Div(
+        className="page-shell",
+        children=[
+            u.build_header(current_page, LOGO_WHITE_URL),
+            html.Div(
+                className="body-shell",
+                children=html.Main(
+                    className="intro-main",
+                    children=html.Div(
+                        className="intro-content",
+                        children=[
+                            html.H1("404 - Page Not Found", className="intro-title"),
+                            html.P("The page you're looking for doesn't exist.", className="intro-desc"),
+                            dcc.Link("← Back to Overview", href="/", className="back-link"),
+                        ],
+                    ),
+                ),
+            ),
+        ],
+    )
     )
     return html.Div(
         className="page-shell",
@@ -476,6 +705,64 @@ app.clientside_callback(
     """,
     Output("page-content", "title"),
     Input("url", "search"),
+PAGE_BUILDERS = {
+    "": introduction_layout,
+    "gccii": gccii_layout,
+    "gtmi": gtmi_layout,
+    "ef": ef_layout,
+    "ccia": ccia_layout,
+    "infra": infra_layout,
+    "piiag": piiag_layout,
+    "pefa": pefa_layout,
+}
+
+# ══════════════════════════════════════════════════════════════════════════
+# App shell / routing
+# ══════════════════════════════════════════════════════════════════════════
+# Routing is driven by the ?page=xxx query string rather than distinct
+# paths (e.g. /gtmi). This is deliberate: Posit Connect deploys each app
+# under its own path prefix (e.g. /content/<guid>/), and dcc.Location's
+# "pathname" reflects that full real-world URL, so exact-string path
+# matching like PAGE_BUILDERS.get("/gtmi") silently breaks in production
+# (every route - including "/" - falls through to the 404 page). A query
+# string tacked onto whatever the real base path happens to be keeps
+# working regardless of where Connect mounts the app.
+
+app.layout = html.Div([
+    dcc.Location(id="url", refresh=False),
+    html.Div(id="page-content"),
+])
+
+
+def _get_page_key(search):
+    """search: dcc.Location's raw query string, e.g. '?page=gtmi' or ''."""
+    if not search:
+        return ""
+    qs = parse_qs(search.lstrip("?"))
+    return qs.get("page", [""])[0]
+
+
+@app.callback(Output("page-content", "children"), Input("url", "search"))
+def render_page(search):
+    current_page = _get_page_key(search)
+    builder = PAGE_BUILDERS.get(current_page, not_found_layout)
+    return builder(current_page)
+
+
+app.clientside_callback(
+    """
+    function(search) {
+        const titles = """ + json.dumps(u.PAGE_TITLES) + """;
+        const base = """ + json.dumps(u.BASE_TITLE) + """;
+        const params = new URLSearchParams(search || "");
+        const page = params.get("page") || "";
+        const subtitle = titles[page];
+        document.title = subtitle ? (base + " - " + subtitle) : base;
+        return "";
+    }
+    """,
+    Output("page-content", "title"),
+    Input("url", "search"),
 )
 
 
@@ -566,6 +853,10 @@ def _gtmi_data(region, pillar):
 
 
 @app.callback(
+    Output("gtmi-map", "figure"),
+    Output("gtmi-legend", "children"),
+    Input("gtmi-region", "value"),
+    Input("gtmi-pillar", "value"),
     Output("gtmi-map", "figure"),
     Output("gtmi-legend", "children"),
     Input("gtmi-region", "value"),
@@ -848,4 +1139,5 @@ def _update_bar_block(selected, method, sample):
 
 
 if __name__ == "__main__":
+    app.run(debug=False, host="127.0.0.1", port=8050)
     app.run(debug=False, host="127.0.0.1", port=8050)
