@@ -267,9 +267,13 @@ def pefa_layout(pathname):
             ("About PEFA", "Public Expenditure and Financial Accountability (PEFA) framework assesses the "
                             "strength of public financial management systems. Scores shown use the latest "
                             "assessment per country."),
-            ("Indicators", "PI-11 — Public Investment Management. PI-11.3 — Project costing & budget "
-                            "alignment. PI-11.4 — Investment project monitoring. PI-12 — Public Asset "
-                            "Management. PI-16 — Medium-term fiscal perspective."),
+            ("Indicators", [
+                "PI-11 — Public Investment Management",
+                "PI-11.3 — Project costing & budget alignment",
+                "PI-11.4 — Investment project monitoring",
+                "PI-12 — Public Asset Management",
+                "PI-16 — Medium-term fiscal perspective",
+            ]),
             ("Explore", "Select a region and indicator, then click a country to see all PI scores for "
                         "that assessment."),
         ]),
@@ -777,3 +781,4 @@ def _update_bar_block(selected, method, sample):
 
 if __name__ == "__main__":
     app.run(debug=False, host="127.0.0.1", port=8050)
+    

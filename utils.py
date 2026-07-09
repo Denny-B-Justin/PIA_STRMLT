@@ -420,7 +420,18 @@ def form_field(label, select_component):
 
 
 def info_block(title, text):
-    return html.Div([html.H4(title, className="info-title"), html.P(text, className="info-text")], className="info-block")
+    """
+    text: a string -> rendered as a single <p> (unchanged behavior), or
+          a list of strings -> rendered as a bulleted <ul><li>...</li></ul>.
+    """
+    if isinstance(text, (list, tuple)):
+        body = html.Ul(
+            [html.Li(item, className="info-list-item") for item in text],
+            className="info-list",
+        )
+    else:
+        body = html.P(text, className="info-text")
+    return html.Div([html.H4(title, className="info-title"), body], className="info-block")
 
 
 def info_blocks_section(blocks):
