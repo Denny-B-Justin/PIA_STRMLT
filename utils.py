@@ -86,7 +86,7 @@ def page_href(page_key):
     "/?page=gtmi" style link still resolves correctly without needing to
     know or replicate Connect's path prefix.
     """
-    return f"/?page={page_key}" if page_key else "/"
+    return f"?page={page_key}" if page_key else "/"
 
 
 def get_mapbox_token() -> str:
