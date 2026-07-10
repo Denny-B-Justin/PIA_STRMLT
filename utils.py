@@ -229,7 +229,7 @@ def build_map_figure(country_data, region, colors, geojson_data, mode="heatmap",
     )
     fig.update_layout(
         mapbox=dict(
-            style=get_mapbox_style(),
+            style= "open-street-map",  #get_mapbox_style(),
             accesstoken=token if token else None,
             center={"lat": zoom_point[0], "lon": zoom_point[1]},
             zoom=3.5,
