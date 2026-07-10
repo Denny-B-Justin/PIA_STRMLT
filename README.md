@@ -35,8 +35,9 @@ python-dotenv
 ## Data source: Databricks Unity Catalog
 
 Every table that used to be a CSV in `./data` now lives in Unity Catalog,
-prefixed `cbd_` (e.g. `ccia_score.csv` → `cbd_ccia_score`). Only
-`world_countries.geojson` stays a local file. ISO A3-coded country 
+prefixed `cbd_` (e.g. `ccia_score.csv` → `cbd_ccia_score`). World boundaries will be from the 
+official World Bank portal which is stored in UC Table `cdb_world_boundaries_dissolved`. It also geospatially
+joins all the territories of countries lik Spain, France, etc. ISO A3-coded country 
 boundaries used for every choropleth. Score/desc/master tables now live in Databricks.
 
 Set these environment variables (a `.env` file in the project root is picked

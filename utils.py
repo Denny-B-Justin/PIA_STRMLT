@@ -141,15 +141,24 @@ def _discrete_colorscale(colors):
 
 # ── Figure builder ────────────────────────────────────────────────────────────
 
-def build_map_figure(country_data, region, colors, geojson_url, mode="heatmap", vmin=None, vmax=None):
+def build_map_figure(country_data, region, colors, geojson_data, mode="heatmap", vmin=None, vmax=None):
     """
     country_data: list of {"cntrCode", "score", "tooltip", "popupRows"} dicts
-    geojson_url: the world_countries.geojson asset URL (from app.get_asset_url()
-                 in app.py). Plotly's Choroplethmapbox accepts a geojson URL
-                 directly and fetches it client-side, so this function never
-                 opens or parses the file itself - utils.py has no Dash app
-                 instance to resolve asset paths with, the same reason
-                 build_header() takes logo_src instead of resolving it here.
+    geojson_data: a GeoJSON FeatureCollection dict containing ONLY the
+                  boundaries for the countries in country_data - from
+                  queries.get_world_boundaries_geojson(iso_codes), which
+                  fetches (and permanently caches, per country) just those
+                  countries' geometry from the cbd_world_boundaries Unity
+                  Catalog table rather than its full ~164MB contents - see
+                  ingest_world_boundaries.py for how that table is built,
+                  and app.py for where iso_codes comes from
+                  (_country_codes(country_data), computed right before this
+                  call at every one of this function's call sites). Plotly's
+                  Choroplethmapbox `geojson` argument accepts either a URL
+                  string or an already-decoded dict; this function never
+                  opens/fetches anything itself - utils.py has no Dash app
+                  instance or Databricks connection, the same reason
+                  build_header() takes logo_src instead of resolving it here.
     mode: "heatmap" (continuous, bucketed into 5 bands) or "categorical"
           (score is already a 0..len(colors)-1 index)
     vmin/vmax: for heatmap mode only. If omitted, computed from the data itself
@@ -157,8 +166,11 @@ def build_map_figure(country_data, region, colors, geojson_url, mode="heatmap", 
     """
     import plotly.graph_objects as go
 
-    if not geojson_url:
-        raise ValueError("build_map_figure() requires geojson_url (pass app.get_asset_url(...) from app.py)")
+    if not geojson_data:
+        raise ValueError(
+            "build_map_figure() requires geojson_data "
+            "(pass queries.get_world_boundaries_geojson(iso_codes) from app.py)"
+        )
 
     if mode == "heatmap" and (vmin is None or vmax is None):
         valid = [d["score"] for d in country_data if d.get("score") is not None]
@@ -188,10 +200,23 @@ def build_map_figure(country_data, region, colors, geojson_url, mode="heatmap", 
 
     fig = go.Figure(
         go.Choroplethmapbox(
-            geojson=geojson_url,
+            geojson=geojson_data,
             locations=locations,
             z=z,
-            featureidkey="properties.iso_a3",
+            # NOTE: geojson_data now comes from q.get_world_boundaries_geojson()
+            # fetching only the requested countries (see queries.py) - each
+            # feature's properties are deliberately minimal, just
+            # {"ISO_A3": code}, since that's the only key this featureidkey
+            # lookup needs. Plotly's featureidkey match is case-sensitive,
+            # so this string must stay "properties.ISO_A3" (upper-case) to
+            # match the key queries.py actually sets.
+            # If the country codes in country_data's `locations` (built from
+            # your other cbd_ tables) ever turn out to be World-Bank-specific
+            # codes that diverge from plain ISO3 for some territory (Kosovo,
+            # Taiwan, West Bank and Gaza, etc.), switch BOTH this string to
+            # "properties.WB_A3" AND queries.py's boundary query/cache to
+            # select+key off wb_a3 instead of iso_a3 - the two must match.
+            featureidkey="properties.ISO_A3",
             colorscale=colorscale,
             zmin=0,
             zmax=n_colors + 1,

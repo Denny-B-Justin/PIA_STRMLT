@@ -6,10 +6,19 @@ All data access for the PFM4CA Country Benchmarking Tool.
 Every table that used to be a CSV in ./data now lives in Databricks Unity
 Catalog, prefixed "cbd_" (e.g. ccia_score.csv -> cbd_ccia_score).
 
-world_countries.geojson now lives in /assets and is served as a static file
-via app.get_asset_url() (see app.py) - Plotly's Choroplethmapbox accepts a
-geojson URL directly and fetches it client-side, so this module no longer
-reads or parses it from disk at all.
+world_countries.geojson no longer lives in /assets as a static file. It has
+been loaded into the Unity Catalog Delta table
+prd_mega.sgpbpi163.cbd_world_boundaries (see ingest_world_boundaries.py for
+the one-off Spark job that populates it). That table is ~164MB, so it is
+never loaded in full: get_world_boundaries_geojson(iso_codes) fetches only
+the specific countries a given map render needs (and permanently caches
+each one, in-process, per ISO3 code, so repeat requests for the same
+country cost nothing) and reconstructs an in-memory GeoJSON
+FeatureCollection dict scoped to just those countries. Plotly's
+Choroplethmapbox accepts either a URL *or* a decoded GeoJSON dict for its
+`geojson` argument, so app.py computes this small per-request dict right
+before every utils.build_map_figure() call instead of resolving one static
+asset URL up front.
 
 This file keeps the exact same public surface as the CSV version -
 load_csv(name) still takes the old CSV basename (no prefix, no extension)
@@ -19,7 +28,9 @@ Only load_csv()'s internals changed: file read -> Databricks SQL query.
 """
 
 import os
+import json
 import logging
+import threading
 from functools import lru_cache
 from typing import Optional
 
@@ -82,15 +93,31 @@ def credentials_provider():
     return oauth_service_principal(config)
 
 
-def _execute_query(query: str) -> pd.DataFrame:
-    """Run a SQL query against the Databricks SQL warehouse, return a DataFrame."""
+def _execute_query(query: str, parameters=None) -> pd.DataFrame:
+    """
+    Run a SQL query against the Databricks SQL warehouse, return a DataFrame.
+
+    `parameters`, if given, is a flat sequence of scalar values bound
+    positionally to `?` placeholders in `query` - this is the connector's
+    native parameterized execution (safe against SQL injection, unlike
+    f-string interpolation directly into the query text). Note: native
+    parameter binding only infers scalar types (str/int/float/bool/date/
+    datetime/Decimal/None) per placeholder - passing one Python list as a
+    single parameter value is NOT supported and raises NotSupportedError.
+    A dynamic-length `WHERE col IN (...)` clause is therefore built with one
+    `?` per value, with `parameters` as the matching flat list of values -
+    see get_world_boundaries_geojson() below for exactly this pattern.
+    """
     with sql.connect(
         server_hostname=SERVER_HOSTNAME,
         http_path=HTTP_PATH,
         credentials_provider=credentials_provider,
     ) as conn:
         cursor = conn.cursor()
-        cursor.execute(query)
+        if parameters:
+            cursor.execute(query, parameters=parameters)
+        else:
+            cursor.execute(query)
         rows = cursor.fetchall()
         columns = [desc[0] for desc in cursor.description]
         return pd.DataFrame(rows, columns=columns)
@@ -126,7 +153,162 @@ def refresh_all_tables() -> None:
     mid-process).
     """
     load_csv.cache_clear()
+    with _boundary_cache_lock:
+        _boundary_feature_cache.clear()
     logging.info("Cleared table cache")
+
+
+# ── World boundaries (country polygons, replaces world_countries.geojson) ────
+# This table lives in a different catalog/schema than every other cbd_*
+# table (prd_mega.sgpbpi163 vs. CBD_CATALOG/CBD_SCHEMA), so it gets its own
+# fully-qualified name here rather than going through load_csv()/TABLE_PREFIX.
+#
+# The table is ~164MB of full-resolution polygon coordinates for every
+# country - `SELECT *` (or even every column) for the whole table on every
+# app load is what was slowing the app down. get_world_boundaries_geojson()
+# below NEVER does that: it takes the specific ISO3 codes a given map render
+# actually needs (region_country_data's cntrCode values - typically a
+# handful to a few dozen countries, not the ~250 in the table) and:
+#   1. Serves anything already seen this process from an in-memory cache
+#      (_boundary_feature_cache, keyed by iso_a3) - zero network round trip.
+#   2. For codes not yet cached, runs ONE query fetching ONLY the iso_a3 and
+#      geometry_json columns (not properties_json, not the other flat
+#      columns) for exactly those codes, via a parameterized
+#      `WHERE iso_a3 IN (?, ?, ...)` clause - both the row filter and the
+#      column filter cut the payload, on top of never re-fetching a country
+#      already seen. The cache then makes every later request for that
+#      country - a different region's map, a page revisit - free.
+
+WORLD_BOUNDARIES_TABLE = os.getenv(
+    "CBD_WORLD_BOUNDARIES_TABLE", "prd_mega.sgpbpi163.cbd_world_boundaries_dissolved"
+)
+
+# Caps how many `?` placeholders go into a single IN (...) clause. Region
+# country lists in this app are at most a few dozen, so this is realistically
+# never hit - it exists purely so a future call site passing an unexpectedly
+# large code list degrades to a few queries instead of one enormous one.
+_BOUNDARY_QUERY_BATCH_SIZE = 200
+
+# iso_a3 -> {"type": "Feature", "properties": {"ISO_A3": ...}, "geometry": {...}}
+# Populated incrementally, never cleared except by refresh_all_tables().
+# A plain dict is safe here without per-read locking (each entry is written
+# once and never mutated after; worst case under a race is two threads both
+# fetching the same missing code and writing the same value twice) - the
+# lock below only serializes the *fetch-and-populate* step so two threads
+# racing on the same cache-miss can't both issue the same Databricks query.
+_boundary_feature_cache: dict[str, dict] = {}
+_boundary_cache_lock = threading.Lock()
+
+
+def get_world_boundaries_geojson(iso_codes) -> dict:
+    """
+    Build a GeoJSON FeatureCollection containing ONLY the requested
+    countries' boundaries - the dynamic replacement for the old "load the
+    whole table" version.
+
+    iso_codes: iterable of ISO3 codes (e.g. [d["cntrCode"] for d in
+               country_data]) - exactly the countries a given map is about
+               to render. Order and duplicates don't matter; codes are
+               de-duplicated and upper-cased before use.
+
+    Returns the same shape Plotly's Choroplethmapbox `geojson` argument
+    expects when passed an in-memory object:
+        {"type": "FeatureCollection", "features": [{"type": "Feature",
+         "properties": {"ISO_A3": "..."}, "geometry": {...}}, ...]}
+
+    Each feature's properties are deliberately minimal - just {"ISO_A3":
+    code} - since that's the only key utils.py's featureidkey="properties.
+    ISO_A3" lookup needs to match a location to its shape; the other 8
+    properties (WB_A3, NAM_0, etc. - see ingest_world_boundaries.py) are not
+    fetched at all here, on top of not fetching rows for countries that
+    aren't being rendered. If you need those other fields for something
+    (e.g. a tooltip), pull them from your existing cbd_ country/name tables
+    instead of this one - this table now exists purely to serve geometry.
+    """
+    if not iso_codes:
+        return {"type": "FeatureCollection", "features": []}
+
+    codes = sorted({str(c).strip().upper() for c in iso_codes if c})
+    if not codes:
+        return {"type": "FeatureCollection", "features": []}
+
+    missing = [c for c in codes if c not in _boundary_feature_cache]
+    if missing:
+        with _boundary_cache_lock:
+            # Re-check inside the lock: another thread may have just
+            # fetched these same codes while we were waiting to acquire it.
+            missing = [c for c in missing if c not in _boundary_feature_cache]
+            if missing:
+                _fetch_and_cache_boundaries(missing)
+
+    features = []
+    not_found = []
+    for c in codes:
+        feature = _boundary_feature_cache.get(c)
+        if feature is None:
+            not_found.append(c)
+        else:
+            features.append(feature)
+
+    if not_found:
+        logging.warning(
+            "No boundary geometry found in %s for %d requested code(s): %s",
+            WORLD_BOUNDARIES_TABLE, len(not_found), not_found,
+        )
+
+    return {"type": "FeatureCollection", "features": features}
+
+
+def _fetch_and_cache_boundaries(codes: list) -> None:
+    """
+    Fetch geometry_json for exactly `codes` (a list of ISO3 codes not yet in
+    _boundary_feature_cache) and populate the cache. Batches into groups of
+    _BOUNDARY_QUERY_BATCH_SIZE to keep any single IN (...) clause bounded.
+    """
+    for start in range(0, len(codes), _BOUNDARY_QUERY_BATCH_SIZE):
+        batch = codes[start:start + _BOUNDARY_QUERY_BATCH_SIZE]
+        placeholders = ", ".join(["?"] * len(batch))
+        query = f"""
+            SELECT iso_a3, geometry_json
+            FROM {WORLD_BOUNDARIES_TABLE}
+            WHERE geometry_json IS NOT NULL
+              AND iso_a3 IN ({placeholders})
+        """
+        logging.info("Fetching %d boundary geometr%s from %s",
+                     len(batch), "y" if len(batch) == 1 else "ies", WORLD_BOUNDARIES_TABLE)
+        try:
+            df = _execute_query(query, parameters=batch)
+        except Exception as e:
+            raise FileNotFoundError(
+                f"Could not load boundaries for {batch} from {WORLD_BOUNDARIES_TABLE}: {e}"
+            ) from e
+
+        found = set()
+        for _, row in df.iterrows():
+            iso = row["iso_a3"]
+            if not iso:
+                continue
+            try:
+                geometry = json.loads(row["geometry_json"]) if row["geometry_json"] else None
+            except (TypeError, ValueError) as e:
+                logging.warning("Skipping malformed boundary row (iso_a3=%s): %s", iso, e)
+                continue
+            if geometry is None:
+                continue
+
+            _boundary_feature_cache[iso] = {
+                "type": "Feature",
+                "properties": {"ISO_A3": iso},
+                "geometry": geometry,
+            }
+            found.add(iso)
+
+        missing_in_table = set(batch) - found
+        if missing_in_table:
+            logging.warning(
+                "%d requested code(s) not present in %s: %s",
+                len(missing_in_table), WORLD_BOUNDARIES_TABLE, sorted(missing_in_table),
+            )
 
 
 # ── Reference data ────────────────────────────────────────────────────────────

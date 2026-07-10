@@ -43,10 +43,12 @@ HERO_BANNER_URL = app.get_asset_url("cbd_hero_banner.png")
 
 FAVICON_URL = app.get_asset_url("favicon.ico")
 
-# world_countries.geojson lives in /assets - resolved once here and passed
-# as a URL into every u.build_map_figure(...) call. Plotly fetches it
-# client-side, so no server-side file read/parse is needed at all.
-GEOJSON_URL = app.get_asset_url("world_countries.geojson")
+
+def _country_codes(country_data):
+    """Pull the ISO3 codes out of a country_data list (list of {"cntrCode",
+    "score", "tooltip", "popupRows"} dicts) - this is what drives which
+    boundaries get requested from Databricks for a given map render."""
+    return [d["cntrCode"] for d in country_data if d.get("cntrCode")]
 
 # Dash normally auto-detects an /assets/favicon.ico on its own via the
 # {%favicon%} template token, but we override index_string explicitly here
@@ -500,7 +502,8 @@ def register_simple_map_page(map_id, legend_id, region_dropdown_id, data_fn, col
             country_data = data_fn(region, extra)
         else:
             country_data = data_fn(region)
-        fig = u.build_map_figure(country_data, region, colors, GEOJSON_URL, mode=mode, vmin=vmin, vmax=vmax)
+        geojson = q.get_world_boundaries_geojson(_country_codes(country_data))
+        fig = u.build_map_figure(country_data, region, colors, geojson, mode=mode, vmin=vmin, vmax=vmax)
         legend = u.build_legend(legend_title, legend_labels, colors)
         return fig, legend
 
@@ -572,16 +575,17 @@ def _gtmi_data(region, pillar):
 )
 def _update_gtmi(region, pillar):
     country_data = _gtmi_data(region, pillar)
+    geojson = q.get_world_boundaries_geojson(_country_codes(country_data))
     is_pims = pillar == "PIMS"
     if is_pims:
-        fig = u.build_map_figure(country_data, region, u.HEX_CODES_3, GEOJSON_URL, mode="categorical")
+        fig = u.build_map_figure(country_data, region, u.HEX_CODES_3, geojson, mode="categorical")
         legend = u.build_legend(
             "PIMS Implementation Status",
             ["Not yet implemented", "PIMS under implementation", "PIMS Implemented"],
             u.HEX_CODES_3,
         )
     else:
-        fig = u.build_map_figure(country_data, region, u.HEX_CODES_5, GEOJSON_URL, mode="heatmap", vmin=0, vmax=1)
+        fig = u.build_map_figure(country_data, region, u.HEX_CODES_5, geojson, mode="heatmap", vmin=0, vmax=1)
         legend = u.build_legend(
             "Average GovTech Score",
             ["Low", "Med-Low", "Medium", "Med-High", "High"],
@@ -647,7 +651,8 @@ GRADE_COLORS = [q.SCORE_COLOR_MAP[g] for g in q.GRADE_ORDER]
 )
 def _update_pefa(region, indicator):
     country_data = q.pefa_country_data(indicator=indicator, framework="Annex 2011")
-    fig = u.build_map_figure(country_data, region, GRADE_COLORS, GEOJSON_URL, mode="categorical")
+    geojson = q.get_world_boundaries_geojson(_country_codes(country_data))
+    fig = u.build_map_figure(country_data, region, GRADE_COLORS, geojson, mode="categorical")
     legend = u.build_legend(f"PEFA {indicator} Score", q.GRADE_ORDER, GRADE_COLORS)
     return fig, legend
 
