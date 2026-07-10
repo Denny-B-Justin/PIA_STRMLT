@@ -199,7 +199,7 @@ def build_map_figure(country_data, region, colors, geojson_data, mode="heatmap",
     token = get_mapbox_token()
 
     fig = go.Figure(
-        go.Choroplethmapbox(
+        go.Choroplethmap(
             geojson=geojson_data,
             locations=locations,
             z=z,
@@ -228,9 +228,18 @@ def build_map_figure(country_data, region, colors, geojson_data, mode="heatmap",
         )
     )
     fig.update_layout(
-        mapbox=dict(
-            style= "open-street-map",  #get_mapbox_style(),
-            accesstoken=token if token else None,
+        # mapbox=dict(
+        #     style= "open-street-map",  #get_mapbox_style(),
+        #     accesstoken=token if token else None,
+        #     center={"lat": zoom_point[0], "lon": zoom_point[1]},
+        #     zoom=3.5,
+        # ),
+        # margin=dict(l=0, r=0, t=0, b=0),
+        # paper_bgcolor="white",
+        # hoverlabel=dict(bgcolor="white", font_size=12, font_family="Inter, sans-serif", align="left"),
+        # uirevision="keep",
+        map=dict(
+            style="open-street-map",
             center={"lat": zoom_point[0], "lon": zoom_point[1]},
             zoom=3.5,
         ),
