@@ -36,7 +36,9 @@ COL_IS_HIER_YES    = "Yes"
 COL_VALID_HIER     = "Valid_Hierarchy"          # "True" / "False" (string)
 COL_COUNTRY        = "CNTRY_SHORT_NAME"
 COL_DLI            = "DLI"
+COL_CMT_AMT        = "CMT_AMT"
 # COL_DLR           = "DLR"
+COL_PARENT_PROJ_ID = "PARENT_PROJ_ID"
 
 # ── Keyword-searchable text columns (in 1b_overall_goat_df) ───────────────────
 # Order matters: checked left-to-right; all five must exist in the table.
@@ -61,11 +63,13 @@ DOWNLOAD_COLUMNS: list[str] = [
     COL_COUNTRY,
     COL_APPRVL_FY,
     COL_PROJ_STAT,
+    # COL_DLR,
+    COL_CMT_AMT,
+    COL_PARENT_PROJ_ID,
     COL_LEND_INSTR,
     COL_REGION,
     COL_PROJ_OBJ,
     COL_DLI,
-    # COL_DLR,
 ]
 
 # ── Chart colour sequence ──────────────────────────────────────────────────────
