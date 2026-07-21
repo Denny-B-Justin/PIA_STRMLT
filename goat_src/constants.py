@@ -39,6 +39,7 @@ COL_DLI            = "DLI"
 COL_CMT_AMT        = "CMT_AMT"
 # COL_DLR           = "DLR"
 COL_PARENT_PROJ_ID = "PARENT_PROJ_ID"
+COL_PROD_LINE_NAME = "PROD_LINE_NAME"
 
 # ── Keyword-searchable text columns (in 1b_overall_goat_df) ───────────────────
 # Order matters: checked left-to-right; all five must exist in the table.
@@ -70,6 +71,7 @@ DOWNLOAD_COLUMNS: list[str] = [
     COL_REGION,
     COL_PROJ_OBJ,
     COL_DLI,
+    COL_PROD_LINE_NAME,
 ]
 
 # ── Chart colour sequence ──────────────────────────────────────────────────────
