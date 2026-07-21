@@ -48,7 +48,7 @@ KEYWORD_SEARCH_COLUMNS: list[str] = [
     "PriorActions",
     "PROJ_DEV_OBJECTIVE_DESC",
     "Components",
-    "DLI,"
+    "DLI"
 ]
 
 # ── Column names — 0c_hierarchy_table_goat ────────────────────────────────────
@@ -65,13 +65,13 @@ DOWNLOAD_COLUMNS: list[str] = [
     COL_APPRVL_FY,
     COL_PROJ_STAT,
     # COL_DLR,
+    COL_PROD_LINE_NAME,
     COL_CMT_AMT,
     COL_PARENT_PROJ_ID,
     COL_LEND_INSTR,
     COL_REGION,
     COL_PROJ_OBJ,
     COL_DLI,
-    COL_PROD_LINE_NAME,
 ]
 
 # ── Chart colour sequence ──────────────────────────────────────────────────────
