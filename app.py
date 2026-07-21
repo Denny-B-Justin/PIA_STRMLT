@@ -1263,6 +1263,9 @@ def load_delete_dropdown(main_tab, _refresh):
     State("input-hier-fullname",  "value"),
     State("input-hier-keywords",  "value"),
     State("store-kw-refresh",     "data"),
+    running=[
+        (Output("btn-add-keyword", "disabled"), True, False),
+    ],
     prevent_initial_call=True,
 )
 def add_keyword(n_clicks, hier_name, full_name, keywords_csv, refresh_count):
@@ -1270,6 +1273,13 @@ def add_keyword(n_clicks, hier_name, full_name, keywords_csv, refresh_count):
     Run vectorised keyword search over all projects, then INSERT new rows
     into the UC table with Valid_Hierarchy = 'True'.
     Clears form inputs on success and bumps store-kw-refresh to reload charts.
+
+    The button is disabled for the duration of this callback (see `running=`
+    above). This operation already takes 30-90s and INSERTs a full batch of
+    project rows, so a double-click here is worse than on Delete Hierarchy —
+    it would kick off two overlapping keyword-search + bulk-INSERT operations
+    against the same table, risking a DELTA_CONCURRENT_APPEND conflict and/or
+    the hierarchy's keywords being inserted twice.
     """
     # ── Validate presence of inputs ────────────────────────────────────────────
     hier_name    = (hier_name    or "").strip()
@@ -1318,12 +1328,20 @@ def add_keyword(n_clicks, hier_name, full_name, keywords_csv, refresh_count):
     Input("btn-delete-hierarchy",  "n_clicks"),
     State("dd-delete-hierarchy",   "value"),
     State("store-kw-refresh",      "data"),
+    running=[
+        (Output("btn-delete-hierarchy", "disabled"), True, False),
+    ],
     prevent_initial_call=True,
 )
 def delete_hierarchy_callback(n_clicks, hierarchy_name, refresh_count):
     """
     Soft-delete: set Valid_Hierarchy = 'False' for the selected hierarchy.
     Bumps store-kw-refresh so the sunburst and delete dropdown reload.
+
+    The button is disabled for the duration of this callback (see `running=`
+    above) so a double-click can't fire two overlapping DELETE writes against
+    the same rows — which is exactly what produced the DELTA_CONCURRENT_APPEND
+    conflict.
     """
     if not hierarchy_name:
         feedback = html.Div(
