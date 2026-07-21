@@ -928,8 +928,8 @@ def _about_content() -> html.Div:
                                         className="about-contact-label",
                                     ),
                                     html.A(
-                                        "kkaiser@worldbank.org",
-                                        href="mailto:kkaiser@worldbank.org",
+                                        "ksingh12@worldbank.org",
+                                        href="mailto:ksingh12@worldbank.org",
                                         className="about-contact-email",
                                     ),
                                 ],
