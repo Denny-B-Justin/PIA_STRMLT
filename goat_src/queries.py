@@ -232,14 +232,36 @@ def build_download_query(
     hierarchies: Optional[List[str]] = None,
     and_or:      str                 = "AND",
 ) -> str:
-    """Project-level DISTINCT rows for Download Data tab / CSV export."""
+    """
+    Project-level rows for Download Data tab / CSV export — one row per PROJ_ID.
+
+    NOTE: this used to be `SELECT DISTINCT` over DOWNLOAD_COLUMNS, but that only
+    collapses rows that are identical across EVERY selected column. DOWNLOAD_COLUMNS
+    includes COL_DLI ("DLI_AMT"), which also appears in KEYWORD_SEARCH_COLUMNS —
+    i.e. it's a granular field that varies across the same hierarchy-duplicated
+    GOAT_TABLE rows this whole app has to dedupe around. So DISTINCT was silently
+    emitting multiple rows per project whenever DLI_AMT differed between a
+    project's hierarchy-tagged rows. Fixed by picking one deterministic row per
+    project (same tiebreak pattern as _get_full_goat_df_deduplicated) instead of
+    relying on column-wise DISTINCT.
+    """
     cols  = ",\n    ".join(DOWNLOAD_COLUMNS)
     where = _build_where(instruments, regions, hierarchies, and_or)
     return (
-        f"SELECT DISTINCT\n"
+        f"SELECT\n"
         f"    {cols}\n"
-        f"FROM {GOAT_TABLE}\n"
-        f"{where}\n"
+        f"FROM (\n"
+        f"    SELECT\n"
+        f"        {cols},\n"
+        f"        ROW_NUMBER() OVER (\n"
+        f"            PARTITION BY {COL_PROJ_ID}\n"
+        f"            ORDER BY {COL_APPRVL_FY} DESC,\n"
+        f"                     COALESCE({COL_HIERARCHY}, '') ASC\n"
+        f"        ) AS _rn\n"
+        f"    FROM {GOAT_TABLE}\n"
+        f"    {where}\n"
+        f") t\n"
+        f"WHERE _rn = 1\n"
         f"ORDER BY {COL_APPRVL_FY} DESC, {COL_PROJ_ID} ASC"
     )
 
@@ -752,15 +774,33 @@ class QueryService:
         """
         Fetch one representative row per PROJ_ID from the GOAT table.
         The GOAT table may contain multiple rows per project (one per hierarchy),
-        so we deduplicate on PROJ_ID after fetching, keeping the first occurrence.
+        so we deduplicate on PROJ_ID after fetching, keeping one row per project.
         The result is cached like any other query.
+
+        IMPORTANT — deterministic tiebreak:
+        PROJ_APPRVL_FY is a project-level attribute, identical across every
+        hierarchy-duplicated row for a given PROJ_ID. That means an
+        `ORDER BY PROJ_APPRVL_FY DESC` alone leaves every row in the partition
+        tied, so ROW_NUMBER() has nothing left to break the tie with and Spark
+        falls back to physical/shuffle order — which is NOT guaranteed to be
+        stable across query executions (AQE re-planning, cluster size, data
+        layout can all change it run-to-run). That's why the "representative"
+        row picked here has been inconsistent: it wasn't actually being chosen
+        deterministically at all.
+
+        Fix: extend the ORDER BY with COL_HIERARCHY (unique per project row,
+        since each row = one project × one hierarchy tag) so the sort fully
+        orders every partition and ROW_NUMBER() = 1 resolves to the exact same
+        physical row on every execution.
         """
-        # We need all actual table columns; use a SELECT * but limit to one
-        # row per project to avoid the cross-join explosion on merge.
         dedup_query = (
             f"SELECT *\n"
             f"FROM (\n"
-            f"    SELECT *, ROW_NUMBER() OVER (PARTITION BY {COL_PROJ_ID} ORDER BY {COL_APPRVL_FY} DESC) AS _rn\n"
+            f"    SELECT *, ROW_NUMBER() OVER (\n"
+            f"        PARTITION BY {COL_PROJ_ID}\n"
+            f"        ORDER BY {COL_APPRVL_FY} DESC,\n"
+            f"                 COALESCE({COL_HIERARCHY}, '') ASC\n"
+            f"    ) AS _rn\n"
             f"    FROM {GOAT_TABLE}\n"
             f"    WHERE {COL_VALID_HIER} = 'True'\n"
             f") t\n"
@@ -770,6 +810,24 @@ class QueryService:
         # Drop the helper column before returning
         if "_rn" in df.columns:
             df = df.drop(columns=["_rn"])
+
+        # ── Safety net ──────────────────────────────────────────────────────
+        # Even with a deterministic ORDER BY, guard against edge cases (e.g. two
+        # rows sharing the same hierarchy tag due to an upstream data issue) by
+        # enforcing uniqueness client-side and surfacing it if it ever triggers,
+        # rather than silently shipping duplicate PROJ_IDs downstream.
+        if COL_PROJ_ID in df.columns:
+            dupe_mask = df.duplicated(subset=[COL_PROJ_ID], keep="first")
+            if dupe_mask.any():
+                logger.warning(
+                    "[GoAT] _get_full_goat_df_deduplicated: %d residual duplicate "
+                    "PROJ_ID row(s) after SQL dedup — dropping extras client-side. "
+                    "This likely indicates duplicate (PROJ_ID, %s) combinations "
+                    "upstream in %s.",
+                    int(dupe_mask.sum()), COL_HIERARCHY, GOAT_TABLE,
+                )
+            df = df.loc[~dupe_mask].reset_index(drop=True)
+
         return df
 
     def _insert_dataframe(self, df: pd.DataFrame) -> None:

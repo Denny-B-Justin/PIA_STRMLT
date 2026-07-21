@@ -33,7 +33,7 @@ import dash
 from dash import dcc, html, Input, Output, State, dash_table, callback_context, no_update
 import dash_bootstrap_components as dbc
 
-from goat_src.constants import ABOUT_TEXT, APP_TITLE
+from goat_src.constants import ABOUT_TEXT, APP_TITLE, DOWNLOAD_COLUMNS
 from goat_src.queries import QueryService
 from goat_src.utils import (
     build_project_status_chart,
@@ -1146,8 +1146,26 @@ def render_download_table(records):
     if not records:
         return [], [], []
 
-    df   = pd.DataFrame(records)
-    cols = [{"name": c, "id": c, "deletable": False} for c in df.columns]
+    column_names = {
+        "PROJ_ID":                  "Project ID",
+        "PROJ_DISPLAY_NAME":        "Project Name",
+        "CNTRY_SHORT_NAME":         "Country",
+        "PROJ_APPRVL_FY":           "Approval Fiscal Year",
+        "PROJ_STAT_NAME":           "Project Status",
+        "PROD_LINE_NAME":           "Product Line Name",
+        "TOT_CMT_AMT":              "Total Commitment Amount",
+        "PARENT_PROJ_ID":           "Parent Project ID",
+        "LNDNG_INSTR_LONG_NAME":    "Lending Instrument",
+        "RGN_NAME":                 "Region",
+        "PROJ_DEV_OBJECTIVE_DESC":   "Project Objective",
+        "DLI_AMT":                  "DLI",
+    }
+
+    df = pd.DataFrame(records).reindex(columns=DOWNLOAD_COLUMNS)
+    cols = [
+        {"name": column_names.get(c, c), "id": c, "deletable": False}
+        for c in DOWNLOAD_COLUMNS
+    ]
 
     tooltip_data = [
         {

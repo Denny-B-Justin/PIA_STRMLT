@@ -15,7 +15,7 @@ APP_ICON  = "📊"
 
 # ── Unity Catalog source tables ────────────────────────────────────────────────
 # Backtick-quoted because the table name starts with a digit.
-GOAT_TABLE      = "`prd_mega`.`sgpbpi163`.`2b_overall_goat_df`"
+GOAT_TABLE      = "`prd_mega`.`sgpbpi163`.`3b_overall_goat_df`"
 HIERARCHY_TABLE = "`prd_mega`.`sgpbpi163`.`0c_hierarchy_table_goat`"
 
 # ── Query cache tuning ─────────────────────────────────────────────────────────
@@ -35,8 +35,8 @@ COL_IS_HIER        = "Ishierarchy_present"
 COL_IS_HIER_YES    = "Yes"
 COL_VALID_HIER     = "Valid_Hierarchy"          # "True" / "False" (string)
 COL_COUNTRY        = "CNTRY_SHORT_NAME"
-COL_DLI            = "DLI"
-COL_CMT_AMT        = "CMT_AMT"
+COL_DLI            = "DLI_AMT"
+COL_CMT_AMT        = "TOT_CMT_AMT"
 # COL_DLR           = "DLR"
 COL_PARENT_PROJ_ID = "PARENT_PROJ_ID"
 COL_PROD_LINE_NAME = "PROD_LINE_NAME"
@@ -48,7 +48,7 @@ KEYWORD_SEARCH_COLUMNS: list[str] = [
     "PriorActions",
     "PROJ_DEV_OBJECTIVE_DESC",
     "Components",
-    "DLI"
+    "DLI_AMT"
 ]
 
 # ── Column names — 0c_hierarchy_table_goat ────────────────────────────────────
