@@ -51,6 +51,7 @@ app = Dash(
 
 db = QueryService.get_instance()
 
+<<<<<<< HEAD
 FAVICON_URL = app.get_asset_url("pia_favicon.ico")
 
 app.index_string = """
@@ -73,6 +74,8 @@ app.index_string = """
 </html>
 """
 
+=======
+>>>>>>> 140f34c8b9f79c2be551e8e850ec21ba4e24c784
 # ── Startup: pre-warm the Zambia query cache ───────────────────────────────────
 # Keyed by country slug so multiple countries can be cached independently.
 # Only Zambia is pre-loaded at startup (most common default).
