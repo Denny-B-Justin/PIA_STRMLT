@@ -39,6 +39,7 @@ from constants import (
 # ── Dash app ──────────────────────────────────────────────────────────────────
 app = Dash(
     __name__,
+    title="Public Infrastructure Access Tool", update_title=None,
     server=server,
     suppress_callback_exceptions=True,
     external_stylesheets=[
@@ -49,6 +50,28 @@ app = Dash(
 )
 
 db = QueryService.get_instance()
+
+FAVICON_URL = app.get_asset_url("pia_favicon.ico")
+
+app.index_string = """
+<!DOCTYPE html>
+<html>
+    <head>
+        {%metas%}
+        <title>{%title%}</title>
+        <link rel="icon" type="image/x-icon" href=\"""" + FAVICON_URL + """\">
+        {%css%}
+    </head>
+    <body>
+        {%app_entry%}
+        <footer>
+            {%config%}
+            {%scripts%}
+            {%renderer%}
+        </footer>
+    </body>
+</html>
+"""
 
 # ── Startup: pre-warm the Zambia query cache ───────────────────────────────────
 # Keyed by country slug so multiple countries can be cached independently.
