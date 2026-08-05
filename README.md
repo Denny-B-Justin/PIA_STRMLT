@@ -11,8 +11,8 @@ Zambia Geospatial Hub: https://zmb-geowb.hub.arcgis.com/apps/4914d79a40414336998
 The active country is selected via a URL query parameter — a single codebase powers a separate, fully-branded geospatial hub for each country.
 
 ```
-datanalytics.worldbank.org/pimpampath-xxxxx?country=zambia   → Zambia hub
-datanalytics.worldbank.org/pimpampath-xxxxx?country=malawi   → Malawi hub
+datanalytics.worldbank.org/content/1cc36c57-f12d-4aa8-92a2-196bb0ea605f/?country=zambia   → Zambia hub
+datanalytics.worldbank.org/content/1cc36c57-f12d-4aa8-92a2-196bb0ea605f/?country=malawi   → Malawi hub
 ```
 
 ---
@@ -38,7 +38,7 @@ datanalytics.worldbank.org/pimpampath-xxxxx?country=malawi   → Malawi hub
 
 ## Overview
 
-This dashboard is part of the **GoAT (Geospatial Optimisation and Accessibility Tool)** initiative under the World Bank's PIM-PAM team. It connects to Unity Catalog tables in Databricks to visualise:
+This dashboard is part of the World Bank's PIM-PAM team. It connects to Unity Catalog tables in Databricks to visualise:
 
 - All **existing** health facilities in the selected country
 - **Proposed new** facility locations ranked by optimisation score

@@ -1313,7 +1313,7 @@ def update_header_title(country):
 )
 def update_footer_text(country):
     cfg = get_country_config(country)
-    return f"World Bank · Public Infrastructure Investment · GoAT · {cfg['display_name']} 2025"
+    return f"World Bank · Public Infrastructure Investment · {cfg['display_name']} 2025"
 
 
 # ── 15. Legend boundary label ─────────────────────────────────────────────────
