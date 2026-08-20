@@ -553,6 +553,77 @@ COUNTRY_CONFIGS: dict = {
             "country_results_template":      "lgu_accessibility_results_khm_{suffix}",
             "province_results_template":     "lgu_accessibility_results_khm_{slug}_province_{suffix}",
         },
+
+    "burkina_faso": {
+            # ── Display ───────────────────────────────────────────────────────────
+            "display_name":     "Burkina Faso",
+            "iso3":             "bfa",
+    
+            # ── Map defaults ──────────────────────────────────────────────────────
+            # Burkina Faso spans roughly 10.2°N–14.2°N, 7.3°W–3.7°E
+            "center_lat":       12.2,
+            "center_lon":       0.5,
+            "map_zoom":         5.0,
+            "province_zoom":    6.0,
+    
+            # ── Population (2025 World Bank estimate) ─────────────────────────────
+            "population":       24_074_580,
+    
+            # ── Databricks catalog / schema ───────────────────────────────────────
+            # Set BURKINA_FASO_CATALOG, BURKINA_FASO_FACILITIES_SCHEMA, BURKINA_FASO_RESULTS_SCHEMA
+            # as env vars on Posit Connect before enabling this country.
+            "catalog_env":               "BURKINA_FASO_CATALOG",
+            "catalog_default":           "prd_mega",
+            "facilities_schema_env":     "BURKINA_FASO_FACILITIES_SCHEMA",
+            "facilities_schema_default": "sgpbpi163",
+            "results_schema_env":        "BURKINA_FASO_RESULTS_SCHEMA",
+            "results_schema_default":    "sgpbpi163",
+    
+            # ── Sub-national administrative units ─────────────────────────────────
+            # Burkina Faso has 13 regions; each contains provinces.  Using regions as the
+            # top-level granularity here; extend to provinces when pipeline is ready.
+            "subnational_label": "Region",
+            "subnational_units": [
+                "Boucle Du Mouhoun", "Cascades", "Centre", "Centre-est", "Centre-nord", "Centre-ouest", "Centre-sud", 
+                "Est", "Hauts-bassins", "Nord", "Plateau Central", "Sahel", "Sud-ouest"
+            ],
+            "subnational_slugs": {
+                "Boucle Du Mouhoun": "boucle_du_mouhoun",
+                "Cascades": "cascades",
+                "Centre": "centre",
+                "Centre-est": "centre_est",
+                "Centre-nord": "centre_nord",
+                "Centre-ouest": "centre_ouest",
+                "Centre-sud": "centre_sud",
+                "Est": "est",
+                "Hauts-bassins": "hauts_bassins",
+                "Nord": "nord",
+                "Plateau Central": "plateau_central",
+                "Sahel": "sahel",
+                "Sud-ouest": "sud_ouest"
+            },
+    
+            # ── Distance bands (same convention as Zambia) ────────────────────────
+            "distance_km_map": {5: 5, 10: 10, "30min": 2, "1hr": 4},
+    
+            # ── Hardcoded baseline fallbacks ──────────────────────────────────────
+            # Update once Malawi baseline data is available in Databricks.
+            "fallback_baselines": {
+                5:       54.13,
+                10:      71.1,
+                "30min": 40.3,
+                "1hr":   50.33,
+            },
+    
+            # ── Table naming conventions (mirror Zambia; zmb → mwi) ───────────────
+            "db_country_name":               "Burkina Faso",
+            "base_table":                    "base_dashboard_data_bfa",
+            "country_facilities_table":      "health_facilities_bfa_osm",
+            "province_facilities_template":  "health_facilities_bfa_osm_{slug}_province",
+            "results_suffix_map": {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"},
+            "country_results_template":      "lgu_accessibility_results_bfa_{suffix}",
+            "province_results_template":     "lgu_accessibility_results_bfa_{slug}_province_{suffix}",
+        },
 }
     
 
