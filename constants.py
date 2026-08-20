@@ -472,6 +472,87 @@ COUNTRY_CONFIGS: dict = {
         "country_results_template":      "lgu_accessibility_results_pak_{suffix}",
         "province_results_template":     "lgu_accessibility_results_pak_{slug}_province_{suffix}",
     },
+    
+    "cambodia": {
+            # ── Display ───────────────────────────────────────────────────────────
+            "display_name":     "Cambodia",
+            "iso3":             "khm",
+    
+            # ── Map defaults ──────────────────────────────────────────────────────
+            # Cambodia spans roughly 10.6°N–14.6°N, 102.2°E–107.6°E
+            "center_lat":       12.5,
+            "center_lon":       104.5,
+            "map_zoom":         4.5,
+            "province_zoom":    6.0,
+    
+            # ── Population (2025 World Bank estimate) ─────────────────────────────
+            "population":       17_847_982,
+    
+            # ── Databricks catalog / schema ───────────────────────────────────────
+            # Set CAMBODIA_CATALOG, CAMBODIA_FACILITIES_SCHEMA, CAMBODIA_RESULTS_SCHEMA
+            # as env vars on Posit Connect before enabling this country.
+            "catalog_env":               "CAMBODIA_CATALOG",
+            "catalog_default":           "prd_mega",
+            "facilities_schema_env":     "CAMBODIA_FACILITIES_SCHEMA",
+            "facilities_schema_default": "sgpbpi163",
+            "results_schema_env":        "CAMBODIA_RESULTS_SCHEMA",
+            "results_schema_default":    "sgpbpi163",
+    
+            # ── Sub-national administrative units ─────────────────────────────────
+            # Cambodia has 23 provinces; each contains districts.  Using provinces as the
+            # top-level granularity here; extend to districts when pipeline is ready.
+            "subnational_label": "Province",
+            "subnational_units": ['Banteay Meanchey', 'Battambang', 'Kampong Cham', 'Kampong Speu', 'Kampong Thom', 
+                            'Kampot', 'Kandal', 'Kep', 'Koh Kong', 'Kratie', 'Mondul Kiri', 'Oddar Meanchey', 'Pailin', 'Phnom Penh', 
+                            'Preah Sihanouk', 'Preah Vihear', 'Prey Veng', 'Pursat', 'Ratanak Kiri', 'Siemreap', 'Svay Rieng', 'Takeo', 'Tboung Khmum'
+                            ],
+            "subnational_slugs": {
+                "Banteay Meanchey": "banteay_meachey",
+                "Battambang": "battambang",
+                "Kampong Cham": "kampong_cham",
+                "Kampong Speu": "kampong_speu",
+                "Kampong Thom": "kampong_thom",
+                "Kampot": "kampot",
+                "Kandal": "kandal",
+                "Kep": "kep",
+                "Koh Kong": "koh_kong",
+                "Kratie": "kratie",
+                "Mondul Kiri": "mondul_kiri",
+                "Oddar Meanchey": "oddar_meachey",
+                "Pailin": "pailin",
+                "Phnom Penh": "phnom_penh",
+                "Preah Sihanouk": "preah_sihanouk",
+                "Preah Vihear": "preah_vihear",
+                "Prey Veng": "prey_veng",
+                "Pursat": "pursat",
+                "Ratanak Kiri": "ratanak_kiri",
+                "Siemreap": "siemreap",
+                "Svay Rieng": "svay_rieng",
+                "Takeo": "takeo",
+                "Tboung Khmum": "tboung_khmum",
+            },
+    
+            # ── Distance bands (same convention as Zambia) ────────────────────────
+            "distance_km_map": {5: 5, 10: 10, "30min": 2, "1hr": 4},
+    
+            # ── Hardcoded baseline fallbacks ──────────────────────────────────────
+            # Update once Malawi baseline data is available in Databricks.
+            "fallback_baselines": {
+                5:       63.18,
+                10:      87.17,
+                "30min": 41.63,
+                "1hr":   56.4,
+            },
+    
+            # ── Table naming conventions (mirror Zambia; zmb → mwi) ───────────────
+            "db_country_name":               "Cambodia",
+            "base_table":                    "base_dashboard_data_khm",
+            "country_facilities_table":      "health_facilities_khm_osm",
+            "province_facilities_template":  "health_facilities_khm_osm_{slug}_province",
+            "results_suffix_map": {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"},
+            "country_results_template":      "lgu_accessibility_results_khm_{suffix}",
+            "province_results_template":     "lgu_accessibility_results_khm_{slug}_province_{suffix}",
+        },
 }
     
 
