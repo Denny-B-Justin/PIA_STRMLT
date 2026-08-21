@@ -850,7 +850,7 @@ COUNTRY_CONFIGS: dict = {
         "province_zoom":    7.0,
 
         # ── Population (2025 World Bank estimate) ─────────────────────────────
-        "population":       2_593_130,
+        "population":       15_099_727,
 
         # ── Databricks catalog / schema ───────────────────────────────────────
         # Set GABON_CATALOG, GABON_FACILITIES_SCHEMA, GABON_RESULTS_SCHEMA
