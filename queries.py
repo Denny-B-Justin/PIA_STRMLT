@@ -6,6 +6,8 @@ import threading
 import pandas as pd
 from databricks import sql
 from databricks.sdk.core import Config, oauth_service_principal
+import re
+import unicodedata
 from typing import Dict, Optional, Tuple
 
 try:
@@ -210,8 +212,17 @@ class QueryService:
         """
         from constants import get_country_config
 
+        def _sanitize_name(name: str) -> str:
+                s = name.strip()
+                s = unicodedata.normalize("NFKD", s)
+                s = "".join(c for c in s if not unicodedata.combining(c))
+                s = s.lower()
+                s = re.sub(r"[^a-z0-9_]", "_", s)
+                s = re.sub(r"_+", "_", s)
+                return s.strip("_")
+
         cfg    = get_country_config(country)
-        loc    = (location or country).strip()
+        loc    = _sanitize_name(location or country).strip()
         cat    = _get_catalog(cfg)
         schema = _get_facilities_schema(cfg)
 

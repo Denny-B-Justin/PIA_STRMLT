@@ -624,6 +624,83 @@ COUNTRY_CONFIGS: dict = {
             "country_results_template":      "lgu_accessibility_results_bfa_{suffix}",
             "province_results_template":     "lgu_accessibility_results_bfa_{slug}_province_{suffix}",
         },
+    
+    "chad": {
+                # ── Display ───────────────────────────────────────────────────────────
+                "display_name":     "Chad",
+                "iso3":             "tcd",
+        
+                # ── Map defaults ──────────────────────────────────────────────────────
+                # Chad spans roughly 10.6°N–14.6°N, 102.2°E–107.6°E
+                "center_lat":       15.5,
+                "center_lon":       18.7,
+                "map_zoom":         4.5,
+                "province_zoom":    6.0,
+        
+                # ── Population (2025 World Bank estimate) ─────────────────────────────
+                "population":       21_003_705,
+        
+                # ── Databricks catalog / schema ───────────────────────────────────────
+                # Set CHAD_CATALOG, CHAD_FACILITIES_SCHEMA, CHAD_RESULTS_SCHEMA
+                # as env vars on Posit Connect before enabling this country.
+                "catalog_env":               "CHAD_CATALOG",
+                "catalog_default":           "prd_mega",
+                "facilities_schema_env":     "CHAD_FACILITIES_SCHEMA",
+                "facilities_schema_default": "sgpbpi163",
+                "results_schema_env":        "CHAD_RESULTS_SCHEMA",
+                "results_schema_default":    "sgpbpi163",
+        
+                # ── Sub-national administrative units ─────────────────────────────────
+                # Chad has 19 Regions; each contains districts.  Using regions as the
+                # top-level granularity here; extend to districts when pipeline is ready.
+                "subnational_label": "Region",
+                "subnational_units": ['Barh el Ghazel', 'Batha', 'Borkou', 'Chari-Baguirmi', 'Hadjer-Lamis', 'Kanem', 
+                                      'Lac', 'Logone Occidental', 'Logone Oriental', 'Mandoul', 'Mayo-Kebbi Est', 
+                                      'Mayo-Kebbi Ouest', 'Moyen-Chari', 'Ouaddaï', 'Salamat', 'Sila', 'Tandjilé', 'Wadi Fira'
+                                      ],
+                "subnational_slugs": {
+                    "Barh el Ghazel": "barh_el_ghazel",
+                    "Batha": "batha",
+                    "Borkou": "borkou",
+                    "Chari-Baguirmi": "chari_baguirmi",
+                    "Hadjer-Lamis": "hadjer_lamis",
+                    "Kanem": "kanem",
+                    "Lac": "lac",
+                    "Logone Occidental": "logone_occidental",
+                    "Logone Oriental": "logone_oriental",
+                    "Mandoul": "mandoul",
+                    "Mayo-Kebbi Est": "mayo_kebbi_est",
+                    "Mayo-Kebbi Ouest": "mayo_kebbi_ouest",
+                    "Moyen-Chari": "moyen_chari",
+                    "Ouaddaï": "ouaddai",
+                    "Salamat": "salamat",
+                    "Sila": "sila",
+                    "Tandjilé": "tandjile",
+                    "Wadi Fira": "wadi_fira"
+                },
+        
+                # ── Distance bands (same convention as Zambia) ────────────────────────
+                "distance_km_map": {5: 5, 10: 10, "30min": 2, "1hr": 4},
+        
+                # ── Hardcoded baseline fallbacks ──────────────────────────────────────
+                # Update once Malawi baseline data is available in Databricks.
+                "fallback_baselines": {
+                    5:       30.06,
+                    10:      45.09,
+                    "30min": 21.58,
+                    "1hr":   27.33,
+                },
+        
+                # ── Table naming conventions (mirror Zambia; zmb → mwi) ───────────────
+                "db_country_name":               "Chad",
+                "base_table":                    "base_dashboard_data_tcd",
+                "country_facilities_table":      "health_facilities_tcd_osm",
+                "province_facilities_template":  "health_facilities_tcd_osm_{slug}_province",
+                "results_suffix_map": {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"},
+                "country_results_template":      "lgu_accessibility_results_tcd_{suffix}",
+                "province_results_template":     "lgu_accessibility_results_tcd_{slug}_province_{suffix}",
+            },
+    
 }
     
 
