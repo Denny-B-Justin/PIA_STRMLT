@@ -563,8 +563,8 @@ COUNTRY_CONFIGS: dict = {
             # Burkina Faso spans roughly 10.2°N–14.2°N, 7.3°W–3.7°E
             "center_lat":       12.2,
             "center_lon":       0.5,
-            "map_zoom":         5.0,
-            "province_zoom":    6.0,
+            "map_zoom":         6.0,
+            "province_zoom":    7.0,
     
             # ── Population (2025 World Bank estimate) ─────────────────────────────
             "population":       24_074_580,
@@ -634,8 +634,8 @@ COUNTRY_CONFIGS: dict = {
                 # Côte d'Ivoire spans roughly 10.2°N–14.2°N, 7.3°W–3.7°E
                 "center_lat":       7.54,
                 "center_lon":       -5.55,
-                "map_zoom":         5.0,
-                "province_zoom":    6.0,
+                "map_zoom":         6.0,
+                "province_zoom":    7.0,
         
                 # ── Population (2025 World Bank estimate) ─────────────────────────────
                 "population":       32_711_547,
@@ -689,13 +689,13 @@ COUNTRY_CONFIGS: dict = {
                 },
         
                 # ── Table naming conventions (mirror Zambia; zmb → mwi) ───────────────
-                "db_country_name":               "Burkina Faso",
-                "base_table":                    "base_dashboard_data_bfa",
-                "country_facilities_table":      "health_facilities_bfa_osm",
-                "province_facilities_template":  "health_facilities_bfa_osm_{slug}_province",
+                "db_country_name":               "Côte d'Ivoire",
+                "base_table":                    "base_dashboard_data_civ",
+                "country_facilities_table":      "health_facilities_civ_osm",
+                "province_facilities_template":  "health_facilities_civ_osm_{slug}_province",
                 "results_suffix_map": {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"},
-                "country_results_template":      "lgu_accessibility_results_bfa_{suffix}",
-                "province_results_template":     "lgu_accessibility_results_bfa_{slug}_province_{suffix}",
+                "country_results_template":      "lgu_accessibility_results_civ_{suffix}",
+                "province_results_template":     "lgu_accessibility_results_civ_{slug}_province_{suffix}",
             },
     
     "chad": {
@@ -783,7 +783,7 @@ COUNTRY_CONFIGS: dict = {
                     # Gabon spans roughly 0.3°N–4.3°N, 8.5°E–14.5°E
                     "center_lat":       2.0,
                     "center_lon":       11.5,
-                    "map_zoom":         5.0,
+                    "map_zoom":         6.0,
                     "province_zoom":    7.0,
             
                     # ── Population (2025 World Bank estimate) ─────────────────────────────

@@ -301,13 +301,19 @@ class QueryService:
                 province_clause = f"province = '{safe_province} Region'"
             default_zoom    = cfg["province_zoom"]
 
-        db_country = cfg["db_country_name"].replace("'", "''")
+        if country == "cote_d_ivoire":
+            # Côte d'Ivoire has a single quote in the name, so escape it for SQL
+            db_country = cfg["db_country_name"]
+            logging.info("Côte d'Ivoire detected; using db_country_name=%s", db_country)
+        else:
+            db_country = cfg["db_country_name"].replace("'", "''")
+            logging.info("Using db_country=%s, country = %s", db_country, country)
 
         query = f"""
             SELECT central_lat, central_long, current_access,
                    total_new_facilities, geometry_wkt
             FROM {cat}.{schema}.{table}
-            WHERE country = '{db_country}'
+            WHERE country = "{db_country}"
               AND {province_clause}
               AND distance_km = {dist_int}
             LIMIT 1
