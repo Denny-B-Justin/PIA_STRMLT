@@ -902,6 +902,72 @@ COUNTRY_CONFIGS: dict = {
         "country_results_template":      "lgu_accessibility_results_gin_{suffix}",
         "province_results_template":     "lgu_accessibility_results_gin_{slug}_province_{suffix}",
     },
+
+    "the_gambia": {
+        # ── Display ───────────────────────────────────────────────────────────
+        "display_name":     "The Gambia",
+        "iso3":             "gmb",
+
+        # ── Map defaults ──────────────────────────────────────────────────────
+        # The Gambia spans roughly 12.5°N–13.5°N, 14.5°W–17.5°W
+        "center_lat":       13.0,
+        "center_lon":       -15.5,
+        "map_zoom":         7.0,
+        "province_zoom":    8.0,
+
+        # ── Population (2025 World Bank estimate) ─────────────────────────────
+        "population":       2_822_093,
+
+        # ── Databricks catalog / schema ───────────────────────────────────────
+        # Set THE_GAMBIA_CATALOG, THE_GAMBIA_FACILITIES_SCHEMA, THE_GAMBIA_RESULTS_SCHEMA
+        # as env vars on Posit Connect before enabling this country.
+        "catalog_env":               "THE_GAMBIA_CATALOG",
+        "catalog_default":           "prd_mega",
+        "facilities_schema_env":     "THE_GAMBIA_FACILITIES_SCHEMA",
+        "facilities_schema_default": "sgpbpi163",
+        "results_schema_env":        "THE_GAMBIA_RESULTS_SCHEMA",
+        "results_schema_default":    "sgpbpi163",
+
+        # ── Sub-national administrative units ─────────────────────────────────
+        # The Gambia has 14 regions; each contains provinces.  Using regions as the
+        # top-level granularity here; extend to provinces when pipeline is ready.
+        "subnational_label": "Region",
+        "subnational_units":  [
+                            'Central River North', 'Central River South', 'Kanifing Municipal Council', 
+                            'Lower River', 'North Bank', 'Upper River', 'West Coast'
+                            ],
+
+        "subnational_slugs": {
+            "Central River North": "central_river_north",
+            "Central River South": "central_river_south",
+            "Kanifing Municipal Council": "kanifing_municipal_council",
+            "Lower River": "lower_river",
+            "North Bank": "north_bank",
+            "Upper River": "upper_river",
+            "West Coast": "west_coast"
+        },
+
+        # ── Distance bands (same convention as Zambia) ────────────────────────
+        "distance_km_map": {5: 5, 10: 10, "30min": 2, "1hr": 4},
+
+        # ── Hardcoded baseline fallbacks ──────────────────────────────────────
+        # Update once Malawi baseline data is available in Databricks.
+        "fallback_baselines": {
+            5:       85.14,
+            10:      99.75,
+            "30min": 59.01,
+            "1hr":   78.98,
+        },
+
+        # ── Table naming conventions (mirror Zambia; zmb → mwi) ───────────────
+        "db_country_name":               "The Gambia",
+        "base_table":                    "base_dashboard_data_gmb",
+        "country_facilities_table":      "health_facilities_gmb_osm",
+        "province_facilities_template":  "health_facilities_gmb_osm_{slug}_province",
+        "results_suffix_map": {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"},
+        "country_results_template":      "lgu_accessibility_results_gmb_{suffix}",
+        "province_results_template":     "lgu_accessibility_results_gmb_{slug}_province_{suffix}",
+    },
   
 }
     
