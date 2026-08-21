@@ -775,69 +775,134 @@ COUNTRY_CONFIGS: dict = {
             },
 
     "gabon": {
-                    # ── Display ───────────────────────────────────────────────────────────
-                    "display_name":     "Gabon",
-                    "iso3":             "gab",
-            
-                    # ── Map defaults ──────────────────────────────────────────────────────
-                    # Gabon spans roughly 0.3°N–4.3°N, 8.5°E–14.5°E
-                    "center_lat":       2.0,
-                    "center_lon":       11.5,
-                    "map_zoom":         6.0,
-                    "province_zoom":    7.0,
-            
-                    # ── Population (2025 World Bank estimate) ─────────────────────────────
-                    "population":       2_593_130,
-            
-                    # ── Databricks catalog / schema ───────────────────────────────────────
-                    # Set GABON_CATALOG, GABON_FACILITIES_SCHEMA, GABON_RESULTS_SCHEMA
-                    # as env vars on Posit Connect before enabling this country.
-                    "catalog_env":               "GABON_CATALOG",
-                    "catalog_default":           "prd_mega",
-                    "facilities_schema_env":     "GABON_FACILITIES_SCHEMA",
-                    "facilities_schema_default": "sgpbpi163",
-                    "results_schema_env":        "GABON_RESULTS_SCHEMA",
-                    "results_schema_default":    "sgpbpi163",
-            
-                    # ── Sub-national administrative units ─────────────────────────────────
-                    # Gabon has 14 regions; each contains provinces.  Using regions as the
-                    # top-level granularity here; extend to provinces when pipeline is ready.
-                    "subnational_label": "Administrative District",
-                    "subnational_units": ['Estuaire', 'Haut-Ogooue', 'Moyen-Ogooue', 'Ngounie', 
-                                          'Ogooue-Maritime', 'Ogooue-lolo'],
-    
-                    "subnational_slugs": {
-                        "Estuaire": "abidjan",
-                        "Haut-Ogooue": "haut_ogooue",
-                        "Moyen-Ogooue": "moyen_ogooue",
-                        "Ngounie": "ngounie",
-                        "Ogooue-Maritime": "ogooue_maritime",
-                        "Ogooue-lolo": "ogooue_lolo"
-                    },
-            
-                    # ── Distance bands (same convention as Zambia) ────────────────────────
-                    "distance_km_map": {5: 5, 10: 10, "30min": 2, "1hr": 4},
-            
-                    # ── Hardcoded baseline fallbacks ──────────────────────────────────────
-                    # Update once Malawi baseline data is available in Databricks.
-                    "fallback_baselines": {
-                        5:       65.55,
-                        10:      71.41,
-                        "30min": 52.74,
-                        "1hr":   63.28,
-                    },
-            
-                    # ── Table naming conventions (mirror Zambia; zmb → mwi) ───────────────
-                    "db_country_name":               "Gabon",
-                    "base_table":                    "base_dashboard_data_gab",
-                    "country_facilities_table":      "health_facilities_gab_osm",
-                    "province_facilities_template":  "health_facilities_gab_osm_{slug}_province",
-                    "results_suffix_map": {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"},
-                    "country_results_template":      "lgu_accessibility_results_gab_{suffix}",
-                    "province_results_template":     "lgu_accessibility_results_gab_{slug}_province_{suffix}",
-                },
-        
-    
+        # ── Display ───────────────────────────────────────────────────────────
+        "display_name":     "Gabon",
+        "iso3":             "gab",
+
+        # ── Map defaults ──────────────────────────────────────────────────────
+        # Gabon spans roughly 0.3°N–4.3°N, 8.5°E–14.5°E
+        "center_lat":       2.0,
+        "center_lon":       11.5,
+        "map_zoom":         6.0,
+        "province_zoom":    7.0,
+
+        # ── Population (2025 World Bank estimate) ─────────────────────────────
+        "population":       2_593_130,
+
+        # ── Databricks catalog / schema ───────────────────────────────────────
+        # Set GABON_CATALOG, GABON_FACILITIES_SCHEMA, GABON_RESULTS_SCHEMA
+        # as env vars on Posit Connect before enabling this country.
+        "catalog_env":               "GABON_CATALOG",
+        "catalog_default":           "prd_mega",
+        "facilities_schema_env":     "GABON_FACILITIES_SCHEMA",
+        "facilities_schema_default": "sgpbpi163",
+        "results_schema_env":        "GABON_RESULTS_SCHEMA",
+        "results_schema_default":    "sgpbpi163",
+
+        # ── Sub-national administrative units ─────────────────────────────────
+        # Gabon has 14 regions; each contains provinces.  Using regions as the
+        # top-level granularity here; extend to provinces when pipeline is ready.
+        "subnational_label": "Administrative District",
+        "subnational_units": ['Estuaire', 'Haut-Ogooue', 'Moyen-Ogooue', 'Ngounie', 
+                                'Ogooue-Maritime', 'Ogooue-lolo'],
+
+        "subnational_slugs": {
+            "Estuaire": "abidjan",
+            "Haut-Ogooue": "haut_ogooue",
+            "Moyen-Ogooue": "moyen_ogooue",
+            "Ngounie": "ngounie",
+            "Ogooue-Maritime": "ogooue_maritime",
+            "Ogooue-lolo": "ogooue_lolo"
+        },
+
+        # ── Distance bands (same convention as Zambia) ────────────────────────
+        "distance_km_map": {5: 5, 10: 10, "30min": 2, "1hr": 4},
+
+        # ── Hardcoded baseline fallbacks ──────────────────────────────────────
+        # Update once Malawi baseline data is available in Databricks.
+        "fallback_baselines": {
+            5:       65.55,
+            10:      71.41,
+            "30min": 52.74,
+            "1hr":   63.28,
+        },
+
+        # ── Table naming conventions (mirror Zambia; zmb → mwi) ───────────────
+        "db_country_name":               "Gabon",
+        "base_table":                    "base_dashboard_data_gab",
+        "country_facilities_table":      "health_facilities_gab_osm",
+        "province_facilities_template":  "health_facilities_gab_osm_{slug}_province",
+        "results_suffix_map": {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"},
+        "country_results_template":      "lgu_accessibility_results_gab_{suffix}",
+        "province_results_template":     "lgu_accessibility_results_gab_{slug}_province_{suffix}",
+    },
+
+    "guinea": {
+        # ── Display ───────────────────────────────────────────────────────────
+        "display_name":     "Guinea",
+        "iso3":             "gin",
+
+        # ── Map defaults ──────────────────────────────────────────────────────
+        # Guinea spans roughly 7.5°N–12.5°N, 7.5°W–15.5°W
+        "center_lat":       9.95,
+        "center_lon":       -9.70,
+        "map_zoom":         6.0,
+        "province_zoom":    7.0,
+
+        # ── Population (2025 World Bank estimate) ─────────────────────────────
+        "population":       2_593_130,
+
+        # ── Databricks catalog / schema ───────────────────────────────────────
+        # Set GABON_CATALOG, GABON_FACILITIES_SCHEMA, GABON_RESULTS_SCHEMA
+        # as env vars on Posit Connect before enabling this country.
+        "catalog_env":               "GABON_CATALOG",
+        "catalog_default":           "prd_mega",
+        "facilities_schema_env":     "GABON_FACILITIES_SCHEMA",
+        "facilities_schema_default": "sgpbpi163",
+        "results_schema_env":        "GABON_RESULTS_SCHEMA",
+        "results_schema_default":    "sgpbpi163",
+
+        # ── Sub-national administrative units ─────────────────────────────────
+        # Gabon has 14 regions; each contains provinces.  Using regions as the
+        # top-level granularity here; extend to provinces when pipeline is ready.
+        "subnational_label": "Region",
+        "subnational_units":  ['Boke', 'Conakry', 'Faranah', 'Kankan', 
+                               'Kindia', 'Labe', 'Mamou', 'Nzerekore'
+                               ],
+
+        "subnational_slugs": {
+            "Boke": "boke",
+            "Conakry": "conakry",
+            "Faranah": "faranah",
+            "Kankan": "kankan",
+            "Kindia": "kindia",
+            "Labe": "labe",
+            "Mamou": "mamou",
+            "Nzerekore": "nzerekore"
+        },
+
+        # ── Distance bands (same convention as Zambia) ────────────────────────
+        "distance_km_map": {5: 5, 10: 10, "30min": 2, "1hr": 4},
+
+        # ── Hardcoded baseline fallbacks ──────────────────────────────────────
+        # Update once Malawi baseline data is available in Databricks.
+        "fallback_baselines": {
+            5:       62.25,
+            10:      80.59,
+            "30min": 46.41,
+            "1hr":   57.43,
+        },
+
+        # ── Table naming conventions (mirror Zambia; zmb → mwi) ───────────────
+        "db_country_name":               "Guinea",
+        "base_table":                    "base_dashboard_data_gin",
+        "country_facilities_table":      "health_facilities_gin_osm",
+        "province_facilities_template":  "health_facilities_gin_osm_{slug}_province",
+        "results_suffix_map": {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"},
+        "country_results_template":      "lgu_accessibility_results_gin_{suffix}",
+        "province_results_template":     "lgu_accessibility_results_gin_{slug}_province_{suffix}",
+    },
+  
 }
     
 
