@@ -968,7 +968,72 @@ COUNTRY_CONFIGS: dict = {
         "country_results_template":      "lgu_accessibility_results_gmb_{suffix}",
         "province_results_template":     "lgu_accessibility_results_gmb_{slug}_province_{suffix}",
     },
-  
+    
+    "cameroon": {
+        # ── Display ───────────────────────────────────────────────────────────
+        "display_name":     "Cameroon",
+        "iso3":             "cmr",
+
+        # ── Map defaults ──────────────────────────────────────────────────────
+        # Cameroon spans roughly 2°N–13°N, 8°E–16°E
+        "center_lat":       8.0,
+        "center_lon":       12.0,
+        "map_zoom":         4.75,
+        "province_zoom":    6.0,
+
+        # ── Population (2025 World Bank estimate) ─────────────────────────────
+        "population":       30_915_000,
+
+        # ── Databricks catalog / schema ───────────────────────────────────────
+        # Set CAMEROON_CATALOG, CAMEROON_FACILITIES_SCHEMA, CAMEROON_RESULTS_SCHEMA
+        # as env vars on Posit Connect before enabling this country.
+        "catalog_env":               "CAMEROON_CATALOG",
+        "catalog_default":           "prd_mega",
+        "facilities_schema_env":     "CAMEROON_FACILITIES_SCHEMA",
+        "facilities_schema_default": "sgpbpi163",
+        "results_schema_env":        "CAMEROON_RESULTS_SCHEMA",
+        "results_schema_default":    "sgpbpi163",
+
+        # ── Sub-national administrative units ─────────────────────────────────
+        # Cameroon has 10 regions; using the region-level granularity here.
+        "subnational_label": "Region",
+        "subnational_units": [
+            'Adamaoua', 'Centre', 'Est', 'Extrême - Nord', 'Littoral', 'Nord', 
+            'Nord - Ouest', 'Ouest', 'Sud', 'Sud - Ouest'
+        ],
+        "subnational_slugs": {
+            "Adamaoua": "adamaoua",
+            "Centre": "centre",
+            "Est": "est",
+            "Extrême - Nord": "extreme_nord",
+            "Littoral": "littoral",
+            "Nord": "nord",
+            "Nord - Ouest": "nord_ouest",
+            "Ouest": "ouest",
+            "Sud": "sud",
+            "Sud - Ouest": "sud_ouest",
+        },
+
+        # ── Distance bands (same convention as Zambia) ────────────────────────
+        "distance_km_map": {5: 5, 10: 10, "30min": 2, "1hr": 4},
+
+        # ── Hardcoded baseline fallbacks ──────────────────────────────────────
+        "fallback_baselines": {
+            5:       56.12,
+            10:      73.44,
+            "30min": 39.61,
+            "1hr":   51.27,
+        },
+
+        # ── Table naming conventions ──────────────────────────────────────────
+        "db_country_name":               "Cameroon",
+        "base_table":                    "base_dashboard_data_cmr",
+        "country_facilities_table":      "health_facilities_cmr_osm",
+        "province_facilities_template":  "health_facilities_cmr_osm_{slug}_province",
+        "results_suffix_map": {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"},
+        "country_results_template":      "lgu_accessibility_results_cmr_{suffix}",
+        "province_results_template":     "lgu_accessibility_results_cmr_{slug}_province_{suffix}",
+    },
 }
     
 
