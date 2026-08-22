@@ -1034,6 +1034,71 @@ COUNTRY_CONFIGS: dict = {
         "country_results_template":      "lgu_accessibility_results_cmr_{suffix}",
         "province_results_template":     "lgu_accessibility_results_cmr_{slug}_province_{suffix}",
     },
+
+    "mali": {
+        # ── Display ───────────────────────────────────────────────────────────
+        "display_name":     "Mali",
+        "iso3":             "mli",
+
+        # ── Map defaults ──────────────────────────────────────────────────────
+        # Mali spans roughly 2°N–13°N, 8°E–16°E
+        "center_lat":       17.57,
+        "center_lon":       -4.00,
+        "map_zoom":         4.50,
+        "province_zoom":    6.0,
+
+        # ── Population (2025 World Bank estimate) ─────────────────────────────
+        "population":       24_478_595,
+
+        # ── Databricks catalog / schema ───────────────────────────────────────
+        # Set MALI_CATALOG, MALI_FACILITIES_SCHEMA, MALI_RESULTS_SCHEMA
+        # as env vars on Posit Connect before enabling this country.
+        "catalog_env":               "MALI_CATALOG",
+        "catalog_default":           "prd_mega",
+        "facilities_schema_env":     "MALI_FACILITIES_SCHEMA",
+        "facilities_schema_default": "sgpbpi163",
+        "results_schema_env":        "MALI_RESULTS_SCHEMA",
+        "results_schema_default":    "sgpbpi163",
+
+        # ── Sub-national administrative units ─────────────────────────────────
+        # Mali has 10 regions; using the region-level granularity here.
+        "subnational_label": "Province",
+        "subnational_units": [
+            'District de Bamako', 'Gao', 'Kayes', 'Kidal', 'Koulikoro', 
+            'Mopti', 'Sikasso', 'Ségou', 'Tombouctou'
+        ],
+        "subnational_slugs": {
+            "District de Bamako": "district_de_bamako",
+            "Gao": "gao",
+            "Kayes": "kayes",
+            "Kidal": "kidal",
+            "Koulikoro": "koulikoro",
+            "Mopti": "mopti",
+            "Sikasso": "sikasso",
+            "Ségou": "sego",
+            "Tombouctou": "tombouctou"
+        },
+
+        # ── Distance bands (same convention as Zambia) ────────────────────────
+        "distance_km_map": {5: 5, 10: 10, "30min": 2, "1hr": 4},
+
+        # ── Hardcoded baseline fallbacks ──────────────────────────────────────
+        "fallback_baselines": {
+            5:       0.0,
+            10:      0.0,
+            "30min": 0.0,
+            "1hr":   0.0,
+        },
+
+        # ── Table naming conventions ──────────────────────────────────────────
+        "db_country_name":               "Mali",
+        "base_table":                    "base_dashboard_data_mli",
+        "country_facilities_table":      "health_facilities_mli_osm",
+        "province_facilities_template":  "health_facilities_mli_osm_{slug}_province",
+        "results_suffix_map": {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"},
+        "country_results_template":      "lgu_accessibility_results_mli_{suffix}",
+        "province_results_template":     "lgu_accessibility_results_mli_{slug}_province_{suffix}",
+    },
 }
     
 
