@@ -1084,10 +1084,10 @@ COUNTRY_CONFIGS: dict = {
 
         # ── Hardcoded baseline fallbacks ──────────────────────────────────────
         "fallback_baselines": {
-            5:       0.0,
+            5:       60.81,
             10:      0.0,
-            "30min": 0.0,
-            "1hr":   0.0,
+            "30min": 47.56,
+            "1hr":   57.04,
         },
 
         # ── Table naming conventions ──────────────────────────────────────────
@@ -1098,6 +1098,70 @@ COUNTRY_CONFIGS: dict = {
         "results_suffix_map": {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"},
         "country_results_template":      "lgu_accessibility_results_mli_{suffix}",
         "province_results_template":     "lgu_accessibility_results_mli_{slug}_province_{suffix}",
+    },
+
+    "niger": {
+        # ── Display ───────────────────────────────────────────────────────────
+        "display_name":     "Niger",
+        "iso3":             "ner",
+
+        # ── Map defaults ──────────────────────────────────────────────────────
+        # Niger spans roughly 10°N–23°N, 0°E–15°E
+        "center_lat":       17.60,
+        "center_lon":       8.08,
+        "map_zoom":         4.50,
+        "province_zoom":    6.0,
+
+        # ── Population (2025 World Bank estimate) ─────────────────────────────
+        "population":       27_917_831,
+
+        # ── Databricks catalog / schema ───────────────────────────────────────
+        # Set NIGER_CATALOG, NIGER_FACILITIES_SCHEMA, NIGER_RESULTS_SCHEMA
+        # as env vars on Posit Connect before enabling this country.
+        "catalog_env":               "NIGER_CATALOG",
+        "catalog_default":           "prd_mega",
+        "facilities_schema_env":     "NIGER_FACILITIES_SCHEMA",
+        "facilities_schema_default": "sgpbpi163",
+        "results_schema_env":        "NIGER_RESULTS_SCHEMA",
+        "results_schema_default":    "sgpbpi163",
+
+        # ── Sub-national administrative units ─────────────────────────────────
+        # Niger has 10 regions; using the region-level granularity here.
+        "subnational_label": "Region",
+        "subnational_units": [
+            'Agadez', 'Communauté Urbaine de Niamey', 'Diffa', 'Dosso', 
+            'Maradi', 'Tahoua', 'Tillabéri', 'Zinder'
+        ],
+        "subnational_slugs": {
+            "Agadez": "agadez",
+            "Communauté Urbaine de Niamey": "communaute_urbaine_de_niamey",
+            "Diffa": "diffa",
+            "Dosso": "dosso",
+            "Maradi": "maradi",
+            "Tahoua": "tahoua",
+            "Tillabéri": "tillaberi",
+            "Zinder": "zinder"
+        },
+
+        # ── Distance bands (same convention as Zambia) ────────────────────────
+        "distance_km_map": {5: 5, 10: 10, "30min": 2, "1hr": 4},
+
+        # ── Hardcoded baseline fallbacks ──────────────────────────────────────
+        "fallback_baselines": {
+            5:       37.15,
+            10:      0.0,
+            "30min": 24.56,
+            "1hr":   0.0,
+        },
+
+        # ── Table naming conventions ──────────────────────────────────────────
+        "db_country_name":               "Niger",
+        "base_table":                    "base_dashboard_data_ner",
+        "country_facilities_table":      "health_facilities_ner_osm",
+        "province_facilities_template":  "health_facilities_ner_osm_{slug}_province",
+        "results_suffix_map": {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"},
+        "country_results_template":      "lgu_accessibility_results_ner_{suffix}",
+        "province_results_template":     "lgu_accessibility_results_ner_{slug}_province_{suffix}",
     },
 }
     
