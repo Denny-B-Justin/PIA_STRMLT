@@ -979,7 +979,7 @@ COUNTRY_CONFIGS: dict = {
         "center_lat":       8.0,
         "center_lon":       12.0,
         "map_zoom":         4.75,
-        "province_zoom":    6.0,
+        "province_zoom":    6.50,
 
         # ── Population (2025 World Bank estimate) ─────────────────────────────
         "population":       30_915_000,
