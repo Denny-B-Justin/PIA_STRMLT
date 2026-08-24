@@ -1308,6 +1308,77 @@ COUNTRY_CONFIGS: dict = {
         "province_results_template":     "lgu_accessibility_results_som_{slug}_province_{suffix}",
     },
 
+    "sudan": {
+        # ── Display ───────────────────────────────────────────────────────────
+        "display_name":     "Sudan",
+        "iso3":             "sdn",
+
+        # ── Map defaults ──────────────────────────────────────────────────────
+        # Sudan spans roughly 3°N–22°N, 21°E–39°E
+        "center_lat":       12.76,
+        "center_lon":       30.84,
+        "map_zoom":         4.75,
+        "province_zoom":    6.0,
+
+        # ── Population (2025 World Bank estimate) ─────────────────────────────
+        "population":       51_662_147,
+
+        # ── Databricks catalog / schema ───────────────────────────────────────
+        # Set SUDAN_CATALOG, SUDAN_FACILITIES_SCHEMA, SUDAN_RESULTS_SCHEMA
+        # as env vars on Posit Connect before enabling this country.
+        "catalog_env":               "SUDAN_CATALOG",
+        "catalog_default":           "prd_mega",
+        "facilities_schema_env":     "SUDAN_FACILITIES_SCHEMA",
+        "facilities_schema_default": "sgpbpi163",
+        "results_schema_env":        "SUDAN_RESULTS_SCHEMA",
+        "results_schema_default":    "sgpbpi163",
+
+        # ── Sub-national administrative units ─────────────────────────────────
+        # Sudan has 15 states; using the state-level granularity here.
+        "subnational_label": "State",
+        "subnational_units": [
+                'Al Jazeera', 'Blue Nile', 'Gadaref', 'Kassala', 'Khartoum', 'Nile', 'Northern', 
+                'Northern Darfur', 'Northern Kordofan', 'Red Sea', 'Southern Darfur', 'Southern Kordofan', 
+                'Western Darfur', 'White Nile'
+        ],
+        "subnational_slugs": {
+            "Al Jazeera": "al_jazeera",
+            "Blue Nile": "blue_nile",
+            "Gadaref": "gadaref",
+            "Kassala": "kassala",
+            "Khartoum": "khartoum",
+            "Nile": "nile",
+            "Northern": "northern",
+            "Northern Darfur": "northern_darfur",
+            "Northern Kordofan": "northern_kordofan",
+            "Red Sea": "red_sea",
+            "Southern Darfur": "southern_darfur",
+            "Southern Kordofan": "southern_kordofan",
+            "Western Darfur": "western_darfur",
+            "White Nile": "white_nile"
+        },
+
+        # ── Distance bands (same convention as Zambia) ────────────────────────
+        "distance_km_map": {5: 5, 10: 10, "30min": 2, "1hr": 4},
+
+        # ── Hardcoded baseline fallbacks ──────────────────────────────────────
+        "fallback_baselines": {
+            5:       0.0,
+            10:      0.0,
+            "30min": 0.0,
+            "1hr":   0.0,
+        },
+
+        # ── Table naming conventions ──────────────────────────────────────────
+        "db_country_name":               "Sudan",
+        "base_table":                    "base_dashboard_data_sud",
+        "country_facilities_table":      "health_facilities_sdn_osm",
+        "province_facilities_template":  "health_facilities_sdn_osm_{slug}_province",
+        "results_suffix_map": {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"},
+        "country_results_template":      "lgu_accessibility_results_sdn_{suffix}",
+        "province_results_template":     "lgu_accessibility_results_sdn_{slug}_province_{suffix}",
+    },
+
 
 }
     
