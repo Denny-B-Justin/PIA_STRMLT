@@ -1163,6 +1163,83 @@ COUNTRY_CONFIGS: dict = {
         "country_results_template":      "lgu_accessibility_results_ner_{suffix}",
         "province_results_template":     "lgu_accessibility_results_ner_{slug}_province_{suffix}",
     },
+
+    "afghanistan": {
+        # ── Display ───────────────────────────────────────────────────────────
+        "display_name":     "Afghanistan",
+        "iso3":             "afg",
+
+        # ── Map defaults ──────────────────────────────────────────────────────
+        # Afghanistan spans roughly 29°N–38°N, 60°E–75°E
+        "center_lat":       33.97,
+        "center_lon":       67.71,
+        "map_zoom":         5.0,
+        "province_zoom":    6.0,
+
+        # ── Population (2025 World Bank estimate) ─────────────────────────────
+        "population":       43_844_111,
+
+        # ── Databricks catalog / schema ───────────────────────────────────────
+        # Set AFGHANISTAN_CATALOG, AFGHANISTAN_FACILITIES_SCHEMA, AFGHANISTAN_RESULTS_SCHEMA
+        # as env vars on Posit Connect before enabling this country.
+        "catalog_env":               "AFGHANISTAN_CATALOG",
+        "catalog_default":           "prd_mega",
+        "facilities_schema_env":     "AFGHANISTAN_FACILITIES_SCHEMA",
+        "facilities_schema_default": "sgpbpi163",
+        "results_schema_env":        "AFGHANISTAN_RESULTS_SCHEMA",
+        "results_schema_default":    "sgpbpi163",
+
+        # ── Sub-national administrative units ─────────────────────────────────
+        # Afghanistan has 34 provinces; using the province-level granularity here.
+        "subnational_label": "Province",
+        "subnational_units": [
+            'Badakhshan', 'Baghlan', 'Balkh', 'Bamyan', 'Daykundi', 'Ghazni', 
+            'Ghor', 'Hilmand', 'Hirat', 'Kabul', 'Kandahar', 'Kunar', 'Kunduz', 
+            'Logar', 'Nangarhar', 'Nimroz', 'Paktya', 'Parwan', 'Samangan'
+        ],
+        "subnational_slugs": {
+            "Badakhshan": "badakhshan",
+            "Baghlan": "baghlan",
+            "Balkh": "balkh",
+            "Bamyan": "bamyan",
+            "Daykundi": "daykundi",
+            "Ghazni": "ghazni",
+            "Ghor": "ghor",
+            "Hilmand": "hilmand",
+            "Hirat": "hirat",
+            "Kabul": "kabul",
+            "Kandahar": "kandahar",
+            "Kunar": "kunar",
+            "Kunduz": "kunduz",
+            "Logar": "logar",
+            "Nangarhar": "nangarhar",
+            "Nimroz": "nimroz",
+            "Paktya": "paktya",
+            "Parwan": "parwan",
+            "Samangan": "samangan"
+        },
+
+        # ── Distance bands (same convention as Zambia) ────────────────────────
+        "distance_km_map": {5: 5, 10: 10, "30min": 2, "1hr": 4},
+
+        # ── Hardcoded baseline fallbacks ──────────────────────────────────────
+        "fallback_baselines": {
+            5:       41.10,
+            10:      53.68,
+            "30min": 27.60,
+            "1hr":   37.21,
+        },
+
+        # ── Table naming conventions ──────────────────────────────────────────
+        "db_country_name":               "Afghanistan",
+        "base_table":                    "base_dashboard_data_afg",
+        "country_facilities_table":      "health_facilities_afg_osm",
+        "province_facilities_template":  "health_facilities_afg_osm_{slug}_province",
+        "results_suffix_map": {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"},
+        "country_results_template":      "lgu_accessibility_results_afg_{suffix}",
+        "province_results_template":     "lgu_accessibility_results_afg_{slug}_province_{suffix}",
+    },
+
 }
     
 
