@@ -1253,7 +1253,7 @@ COUNTRY_CONFIGS: dict = {
         "province_zoom":    6.0,
 
         # ── Population (2025 World Bank estimate) ─────────────────────────────
-        "population":       43_844_111,
+        "population":       19_654_739,
 
         # ── Databricks catalog / schema ───────────────────────────────────────
         # Set SOMALIA_CATALOG, SOMALIA_FACILITIES_SCHEMA, SOMALIA_RESULTS_SCHEMA
@@ -1292,10 +1292,10 @@ COUNTRY_CONFIGS: dict = {
 
         # ── Hardcoded baseline fallbacks ──────────────────────────────────────
         "fallback_baselines": {
-            5:       41.10,
-            10:      53.68,
-            "30min": 27.60,
-            "1hr":   37.21,
+            5:       34.01,
+            10:      0.0,
+            "30min": 24.64,
+            "1hr":   0.0,
         },
 
         # ── Table naming conventions ──────────────────────────────────────────
