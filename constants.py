@@ -1240,6 +1240,75 @@ COUNTRY_CONFIGS: dict = {
         "province_results_template":     "lgu_accessibility_results_afg_{slug}_province_{suffix}",
     },
 
+    "somalia": {
+        # ── Display ───────────────────────────────────────────────────────────
+        "display_name":     "Somalia",
+        "iso3":             "som",
+
+        # ── Map defaults ──────────────────────────────────────────────────────
+        # Somalia spans roughly 29°N–38°N, 60°E–75°E
+        "center_lat":       5.17,
+        "center_lon":       46.2,
+        "map_zoom":         5.0,
+        "province_zoom":    6.0,
+
+        # ── Population (2025 World Bank estimate) ─────────────────────────────
+        "population":       43_844_111,
+
+        # ── Databricks catalog / schema ───────────────────────────────────────
+        # Set SOMALIA_CATALOG, SOMALIA_FACILITIES_SCHEMA, SOMALIA_RESULTS_SCHEMA
+        # as env vars on Posit Connect before enabling this country.
+        "catalog_env":               "SOMALIA_CATALOG",
+        "catalog_default":           "prd_mega",
+        "facilities_schema_env":     "SOMALIA_FACILITIES_SCHEMA",
+        "facilities_schema_default": "sgpbpi163",
+        "results_schema_env":        "SOMALIA_RESULTS_SCHEMA",
+        "results_schema_default":    "sgpbpi163",
+
+        # ── Sub-national administrative units ─────────────────────────────────
+        # Somalia has 18 regions; using the region-level granularity here.
+        "subnational_label": "Region",
+        "subnational_units": [
+            'Awdal', 'Banadir', 'Bari', 'Bay', 'Galgaduud', 'Hiraan', 'Juba Hoose', 
+            'Shabelle Dhexe', 'Shabelle Hoose', 'Sool', 'Togdheer', 'Woqooyi Galbeed'
+        ],
+        "subnational_slugs": {
+            "Awdal": "awdal",
+            "Banadir": "banadir",
+            "Bari": "bari",
+            "Bay": "bay",
+            "Galgaduud": "galgaduud",
+            "Hiraan": "hiraan",
+            "Juba Hoose": "juba_hoose",
+            "Shabelle Dhexe": "shabelle_dhexe",
+            "Shabelle Hoose": "shabelle_hoose",
+            "Sool": "sool",
+            "Togdheer": "togdheer",
+            "Woqooyi Galbeed": "woqooyi_galbeed"
+        },
+
+        # ── Distance bands (same convention as Zambia) ────────────────────────
+        "distance_km_map": {5: 5, 10: 10, "30min": 2, "1hr": 4},
+
+        # ── Hardcoded baseline fallbacks ──────────────────────────────────────
+        "fallback_baselines": {
+            5:       41.10,
+            10:      53.68,
+            "30min": 27.60,
+            "1hr":   37.21,
+        },
+
+        # ── Table naming conventions ──────────────────────────────────────────
+        "db_country_name":               "Somalia",
+        "base_table":                    "base_dashboard_data_som",
+        "country_facilities_table":      "health_facilities_som_osm",
+        "province_facilities_template":  "health_facilities_som_osm_{slug}_province",
+        "results_suffix_map": {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"},
+        "country_results_template":      "lgu_accessibility_results_som_{suffix}",
+        "province_results_template":     "lgu_accessibility_results_som_{slug}_province_{suffix}",
+    },
+
+
 }
     
 
