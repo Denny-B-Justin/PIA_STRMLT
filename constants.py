@@ -59,7 +59,6 @@ from __future__ import annotations
 
 COUNTRY_CONFIGS: dict = {
 
-    # ──────────────────────────────────────────────────────────────────────────
     "zambia": {
         # ── Display ───────────────────────────────────────────────────────────
         "display_name":     "Zambia",
@@ -125,7 +124,6 @@ COUNTRY_CONFIGS: dict = {
         "province_results_template":     "lgu_accessibility_results_zmb_{slug}_province_{suffix}",
     },
 
-    # ──────────────────────────────────────────────────────────────────────────
     "malawi": {
         # ── Display ───────────────────────────────────────────────────────────
         "display_name":     "Malawi",
