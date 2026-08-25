@@ -1377,6 +1377,70 @@ COUNTRY_CONFIGS: dict = {
         "province_results_template":     "lgu_accessibility_results_sdn_{slug}_province_{suffix}",
     },
 
+    "bangladesh": {
+        # ── Display ───────────────────────────────────────────────────────────
+        "display_name":     "Bangladesh",
+        "iso3":             "bgd",
+
+        # ── Map defaults ──────────────────────────────────────────────────────
+        # Bangladesh spans roughly 20°N–27°N, 88°E–93°E
+        "center_lat":       23.68,
+        "center_lon":       30.84,
+        "map_zoom":         6.0,
+        "province_zoom":    7.0,
+
+        # ── Population (2025 World Bank estimate) ─────────────────────────────
+        "population":       51_662_147,
+
+        # ── Databricks catalog / schema ───────────────────────────────────────
+        # Set BANGLADESH_CATALOG, BANGLADESH_FACILITIES_SCHEMA, BANGLADESH_RESULTS_SCHEMA
+        # as env vars on Posit Connect before enabling this country.
+        "catalog_env":               "BANGLADESH_CATALOG",
+        "catalog_default":           "prd_mega",
+        "facilities_schema_env":     "BANGLADESH_FACILITIES_SCHEMA",
+        "facilities_schema_default": "sgpbpi163",
+        "results_schema_env":        "BANGLADESH_RESULTS_SCHEMA",
+        "results_schema_default":    "sgpbpi163",
+
+        # ── Sub-national administrative units ─────────────────────────────────
+        # Bangladesh has 8 divisions; using the division-level granularity here.
+        "subnational_label": "Division",
+        "subnational_units": [
+            'Barishal', 'Chattogram', 'Dhaka', 'Khulna', 'Mymensingh', 'Rajshahi', 
+            'Rangpur', 'Sylhet'
+        ],
+        "subnational_slugs": {
+            "Barishal": "barishal",
+            "Chattogram": "chattogram",
+            "Dhaka": "dhaka",
+            "Khulna": "khulna",
+            "Mymensingh": "mymensingh",
+            "Rajshahi": "rajshahi",
+            "Rangpur": "rangpur",
+            "Sylhet": "sylhet"
+        },
+
+        # ── Distance bands (same convention as Zambia) ────────────────────────
+        "distance_km_map": {5: 5, 10: 10, "30min": 2, "1hr": 4},
+
+        # ── Hardcoded baseline fallbacks ──────────────────────────────────────
+        "fallback_baselines": {
+            5:       88.01,
+            10:      0.0,
+            "30min": 51.10,
+            "1hr":   0.0,
+        },
+
+        # ── Table naming conventions ──────────────────────────────────────────
+        "db_country_name":               "Bangladesh",
+        "base_table":                    "base_dashboard_data_bgd",
+        "country_facilities_table":      "health_facilities_bgd_osm",
+        "province_facilities_template":  "health_facilities_bgd_osm_{slug}_province",
+        "results_suffix_map": {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"},
+        "country_results_template":      "lgu_accessibility_results_bgd_{suffix}",
+        "province_results_template":     "lgu_accessibility_results_bgd_{slug}_province_{suffix}",
+    },
+
 
 }
     
