@@ -1390,7 +1390,7 @@ COUNTRY_CONFIGS: dict = {
         "province_zoom":    7.0,
 
         # ── Population (2025 World Bank estimate) ─────────────────────────────
-        "population":       51_662_147,
+        "population":       175_686_899,
 
         # ── Databricks catalog / schema ───────────────────────────────────────
         # Set BANGLADESH_CATALOG, BANGLADESH_FACILITIES_SCHEMA, BANGLADESH_RESULTS_SCHEMA
@@ -1440,6 +1440,75 @@ COUNTRY_CONFIGS: dict = {
         "country_results_template":      "lgu_accessibility_results_bgd_{suffix}",
         "province_results_template":     "lgu_accessibility_results_bgd_{slug}_province_{suffix}",
     },
+
+    "ethiopia": {
+        # ── Display ───────────────────────────────────────────────────────────
+        "display_name":     "Ethiopia",
+        "iso3":             "eth",
+
+        # ── Map defaults ──────────────────────────────────────────────────────
+        # Ethiopia spans roughly 3°N–15°N, 33°E–48°E
+        "center_lat":       8.46,
+        "center_lon":       39.82,
+        "map_zoom":         5.0,
+        "province_zoom":    6.0,
+
+        # ── Population (2025 World Bank estimate) ─────────────────────────────
+        "population":       135_472_051,
+
+        # ── Databricks catalog / schema ───────────────────────────────────────
+        # Set ETHIOPIA_CATALOG, ETHIOPIA_FACILITIES_SCHEMA, ETHIOPIA_RESULTS_SCHEMA
+        # as env vars on Posit Connect before enabling this country.
+        "catalog_env":               "ETHIOPIA_CATALOG",
+        "catalog_default":           "prd_mega",
+        "facilities_schema_env":     "ETHIOPIA_FACILITIES_SCHEMA",
+        "facilities_schema_default": "sgpbpi163",
+        "results_schema_env":        "ETHIOPIA_RESULTS_SCHEMA",
+        "results_schema_default":    "sgpbpi163",
+
+        # ── Sub-national administrative units ─────────────────────────────────
+        # Ethiopia has 12 regions; using the region-level granularity here.
+        "subnational_label": "Region",
+        "subnational_units": [
+            'Addis Ababa', 'Afar', 'Amhara', 'Dire Dawa', 'Gambela', 'Harari', 'Oromia', 
+            'SNNP', 'Sidama', 'Somali', 'South West Ethiopia', 'Tigray'
+        ],
+        "subnational_slugs": {
+            "Addis Ababa": "addis_ababa",
+            "Afar": "afar",
+            "Amhara": "amhara",
+            "Dire Dawa": "dire_dawa",
+            "Gambela": "gambela",
+            "Harari": "harari",
+            "Oromia": "oromia",
+            "SNNP": "snnps",
+            "Sidama": "sidama",
+            "Somali": "somali",
+            "Tigray": "tigray",
+            "South West Ethiopia": "south_west_ethiopia",
+        },
+        # ── Distance bands (same convention as Zambia) ────────────────────────
+        "distance_km_map": {5: 5, 10: 10, "30min": 2, "1hr": 4},
+
+        # ── Hardcoded baseline fallbacks ──────────────────────────────────────
+        "fallback_baselines": {
+            5:       0.0,
+            10:      0.0,
+            "30min": 15.95,
+            "1hr":   0.0,
+        },
+
+        # ── Table naming conventions ──────────────────────────────────────────
+        "db_country_name":               "Ethiopia",
+        "base_table":                    "base_dashboard_data_eth",
+        "country_facilities_table":      "health_facilities_eth_osm",
+        "province_facilities_template":  "health_facilities_eth_osm_{slug}_province",
+        "results_suffix_map": {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"},
+        "country_results_template":      "lgu_accessibility_results_eth_{suffix}",
+        "province_results_template":     "lgu_accessibility_results_eth_{slug}_province_{suffix}",
+    },
+
+
 
 
 }
