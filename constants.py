@@ -1371,7 +1371,7 @@ COUNTRY_CONFIGS: dict = {
 
         # ── Table naming conventions ──────────────────────────────────────────
         "db_country_name":               "Sudan",
-        "base_table":                    "base_dashboard_data_sud",
+        "base_table":                    "base_dashboard_data_sdn",
         "country_facilities_table":      "health_facilities_sdn_osm",
         "province_facilities_template":  "health_facilities_sdn_osm_{slug}_province",
         "results_suffix_map": {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"},
