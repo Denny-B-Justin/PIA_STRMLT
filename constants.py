@@ -1535,7 +1535,7 @@ COUNTRY_CONFIGS: dict = {
 
         # ── Sub-national administrative units ─────────────────────────────────
         # South Sudan has 10 states; using the state-level granularity here.
-        "subnational_label": "Region",
+        "subnational_label": "State",
         "subnational_units": [
             'Central Equatoria', 'Eastern Equatoria', 'Jonglei', 'Lakes', 
             'Northern Bahr el Ghazal', 'Pibor Administrative Area', 
