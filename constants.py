@@ -1508,7 +1508,76 @@ COUNTRY_CONFIGS: dict = {
         "province_results_template":     "lgu_accessibility_results_eth_{slug}_province_{suffix}",
     },
 
+    "south_sudan": {
+        # ── Display ───────────────────────────────────────────────────────────
+        "display_name":     "South Sudan",
+        "iso3":             "ssd",
 
+        # ── Map defaults ──────────────────────────────────────────────────────
+        # South Sudan spans roughly 3°N–15°N, 33°E–48°E
+        "center_lat":       6.87,
+        "center_lon":       31.32,
+        "map_zoom":         5.0,
+        "province_zoom":    6.0,
+
+        # ── Population (2025 World Bank estimate) ─────────────────────────────
+        "population":       12_188_788,
+
+        # ── Databricks catalog / schema ───────────────────────────────────────
+        # Set SOUTH_SUDAN_CATALOG, SOUTH_SUDAN_FACILITIES_SCHEMA, SOUTH_SUDAN_RESULTS_SCHEMA
+        # as env vars on Posit Connect before enabling this country.
+        "catalog_env":               "SOUTH_SUDAN_CATALOG",
+        "catalog_default":           "prd_mega",
+        "facilities_schema_env":     "SOUTH_SUDAN_FACILITIES_SCHEMA",
+        "facilities_schema_default": "sgpbpi163",
+        "results_schema_env":        "SOUTH_SUDAN_RESULTS_SCHEMA",
+        "results_schema_default":    "sgpbpi163",
+
+        # ── Sub-national administrative units ─────────────────────────────────
+        # South Sudan has 10 states; using the state-level granularity here.
+        "subnational_label": "Region",
+        "subnational_units": [
+            'Central Equatoria', 'Eastern Equatoria', 'Jonglei', 'Lakes', 
+            'Northern Bahr el Ghazal', 'Pibor Administrative Area', 
+            'Ruweng Administrative Area', 'Unity', 'Upper Nile', 'Warrap', 
+            'Western Bahr el Ghazal', 'Western Equatoria'
+        ],
+        "subnational_slugs": {
+            "Central Equatoria": "central_equatoria",
+            "Eastern Equatoria": "eastern_equatoria",
+            "Jonglei": "jonglei",
+            "Lakes": "lakes",
+            "Northern Bahr el Ghazal": "northern_bahr_el_ghazal",
+            "Pibor Administrative Area": "pibor_administrative_area",
+            "Ruweng Administrative Area": "ruweng_administrative_area",
+            "Unity": "unity",
+            "Upper Nile": "upper_nile",
+            "Warrap": "warrap",
+            "Western Bahr el Ghazal": "western_bahr_el_ghazal",
+            "Western Equatoria": "western_equatoria"
+        },
+        # ── Distance bands (same convention as Zambia) ────────────────────────
+        "distance_km_map": {5: 5, 10: 10, "30min": 2, "1hr": 4},
+
+        # ── Hardcoded baseline fallbacks ──────────────────────────────────────
+        "fallback_baselines": {
+            5:       0.0,
+            10:      0.0,
+            "30min": 40.21,
+            "1hr":   0.0,
+        },
+
+        # ── Table naming conventions ──────────────────────────────────────────
+        "db_country_name":               "South Sudan",
+        "base_table":                    "base_dashboard_data_ssd",
+        "country_facilities_table":      "health_facilities_ssd_osm",
+        "province_facilities_template":  "health_facilities_ssd_osm_{slug}_province",
+        "results_suffix_map": {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"},
+        "country_results_template":      "lgu_accessibility_results_ssd_{suffix}",
+        "province_results_template":     "lgu_accessibility_results_ssd_{slug}_province_{suffix}",
+    },
+    
+    
 
 
 }
