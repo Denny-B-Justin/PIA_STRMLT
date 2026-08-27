@@ -1675,6 +1675,77 @@ COUNTRY_CONFIGS: dict = {
         "country_results_template":      "lgu_accessibility_results_rou_{suffix}",
         "province_results_template":     "lgu_accessibility_results_rou_{slug}_province_{suffix}",
     },
+
+    "syria": {
+        # ── Display ───────────────────────────────────────────────────────────
+        "display_name":     "Syrian Arab Republic",
+        "iso3":             "syr",
+
+        # ── Map defaults ──────────────────────────────────────────────────────
+        # Syria spans roughly 32°N–37°N, 36°E–42°E
+        "center_lat":       35.0,
+        "center_lon":       38.0,
+        "map_zoom":         6.0,
+        "province_zoom":    7.0,
+
+        # ── Population (2025 World Bank estimate) ─────────────────────────────
+        "population":       25_620_427,
+
+        # ── Databricks catalog / schema ───────────────────────────────────────
+        # Set SYRIA_CATALOG, SYRIA_FACILITIES_SCHEMA, SYRIA_RESULTS_SCHEMA
+        # as env vars on Posit Connect before enabling this country.
+        "catalog_env":               "SYRIA_CATALOG",
+        "catalog_default":           "prd_mega",
+        "facilities_schema_env":     "SYRIA_FACILITIES_SCHEMA",
+        "facilities_schema_default": "sgpbpi163",
+        "results_schema_env":        "SYRIA_RESULTS_SCHEMA",
+        "results_schema_default":    "sgpbpi163",
+
+        # ── Sub-national administrative units ─────────────────────────────────
+        # Syria has 15 governorates; using the governorate-level granularity here.
+        "subnational_label": "Governorate",
+        "subnational_units": [
+             'Al Ḥasakah', 'Aleppo', 'Ar Raqqah', 'Damascus', 
+              'Dar`ā', 'Dayr az Zawr', 'Hama', 'Idlib', 'Latakia', 'Quneitra', 
+              'Rif Dimashq', 'Ţarţūs', 'Ḥimṣ'
+        ],
+        "subnational_slugs": {
+            "Al Ḥasakah": "al_hasakah",
+            "Aleppo": "aleppo",
+            "Ar Raqqah": "ar_raqqah",
+            "As Suwaydā'": "as_suwayda",
+            "Damascus": "damascus",
+            "Dar`ā": "dar_a",
+            "Dayr az Zawr": "dayr_az_zawr",
+            "Hama": "hama",
+            "Idlib": "idlib",
+            "Latakia": "latakia",
+            "Quneitra": "quneitra",
+            "Rif Dimashq": "rif_dimashq",
+            "Ţarţūs": "tar_tus",
+            "Ḥimṣ": "him_s"
+        },
+
+        # ── Distance bands (same convention as Zambia) ────────────────────────
+        "distance_km_map": {5: 5, 10: 10, "30min": 2, "1hr": 4},
+
+        # ── Hardcoded baseline fallbacks ──────────────────────────────────────
+        "fallback_baselines": {
+            5:       74.00,
+            10:      89.06,
+            "30min": 58.09,
+            "1hr":   69.00,
+        },
+
+        # ── Table naming conventions ──────────────────────────────────────────
+        "db_country_name":               "Syrian Arab Republic",
+        "base_table":                    "base_dashboard_data_syr",
+        "country_facilities_table":      "health_facilities_syr_osm",
+        "province_facilities_template":  "health_facilities_syr_osm_{slug}_province",
+        "results_suffix_map": {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"},
+        "country_results_template":      "lgu_accessibility_results_syr_{suffix}",
+        "province_results_template":     "lgu_accessibility_results_syr_{slug}_province_{suffix}",
+    },
     
     
 
