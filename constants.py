@@ -1746,6 +1746,78 @@ COUNTRY_CONFIGS: dict = {
         "country_results_template":      "lgu_accessibility_results_syr_{suffix}",
         "province_results_template":     "lgu_accessibility_results_syr_{slug}_province_{suffix}",
     },
+
+    "west_bank_and_gaza": {
+        # ── Display ───────────────────────────────────────────────────────────
+        "display_name":     "West Bank and Gaza",
+        "iso3":             "pse",
+
+        # ── Map defaults ──────────────────────────────────────────────────────
+        # West Bank and Gaza spans roughly 31°N–33°N, 34°E–36°E
+        "center_lat":       32.0,
+        "center_lon":       35.0,
+        "map_zoom":         8.0,
+        "province_zoom":    9.0,
+
+        # ── Population (2025 World Bank estimate) ─────────────────────────────
+        "population":       5_413_596,
+
+        # ── Databricks catalog / schema ───────────────────────────────────────
+        # Set WEST_BANK_GAZA_CATALOG, WEST_BANK_GAZA_FACILITIES_SCHEMA, WEST_BANK_GAZA_RESULTS_SCHEMA
+        # as env vars on Posit Connect before enabling this country.
+        "catalog_env":               "WEST_BANK_GAZA_CATALOG",
+        "catalog_default":           "prd_mega",
+        "facilities_schema_env":     "WEST_BANK_GAZA_FACILITIES_SCHEMA",
+        "facilities_schema_default": "sgpbpi163",
+        "results_schema_env":        "WEST_BANK_GAZA_RESULTS_SCHEMA",
+        "results_schema_default":    "sgpbpi163",
+
+        # ── Sub-national administrative units ─────────────────────────────────
+        # Syria has 15 governorates; using the governorate-level granularity here.
+        "subnational_label": "Governorate",
+        "subnational_units": [
+                'Al Khalil (Hebron)', 'Al Quds (Jerusalem)', 'Bethlehem', 'Deir al Balah', 
+                'Gaza', 'Jabalya', 'Jenin', 'Khan Yunis', 'Nablus', 'Qalqiliya', 
+                'Rafah', 'Ramallah', 'Salfit', 'Tubas', 'Tulkarm'
+        ],
+        "subnational_slugs": {
+            "Al Khalil (Hebron)": "al_khalil",
+            "Al Quds (Jerusalem)": "al_quds",
+            "Bethlehem": "bethlehem",
+            "Deir al Balah": "deir_al_balah",
+            "Gaza": "gaza",
+            "Jabalya": "jabalya",
+            "Jenin": "jenin",
+            "Khan Yunis": "khan_yunis",
+            "Nablus": "nablus",
+            "Qalqiliya": "qalqiliya",
+            "Rafah": "rafah",
+            "Ramallah": "ramallah",
+            "Salfit": "salfit",
+            "Tubas": "tubas",
+            "Tulkarm": "tulkarm"
+        },
+
+        # ── Distance bands (same convention as Zambia) ────────────────────────
+        "distance_km_map": {5: 5, 10: 10, "30min": 2, "1hr": 4},
+
+        # ── Hardcoded baseline fallbacks ──────────────────────────────────────
+        "fallback_baselines": {
+            5:       99.73,
+            10:      00.00,
+            "30min": 96.93,
+            "1hr":   100,
+        },
+
+        # ── Table naming conventions ──────────────────────────────────────────
+        "db_country_name":               "West Bank and Gaza",
+        "base_table":                    "base_dashboard_data_pse",
+        "country_facilities_table":      "health_facilities_pse_osm",
+        "province_facilities_template":  "health_facilities_pse_osm_{slug}_province",
+        "results_suffix_map": {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"},
+        "country_results_template":      "lgu_accessibility_results_pse_{suffix}",
+        "province_results_template":     "lgu_accessibility_results_pse_{slug}_province_{suffix}",
+    },
     
     
 
