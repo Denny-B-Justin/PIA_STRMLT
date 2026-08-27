@@ -1063,7 +1063,7 @@ COUNTRY_CONFIGS: dict = {
         "subnational_label": "Province",
         "subnational_units": [
             'District de Bamako', 'Gao', 'Kayes', 'Kidal', 'Koulikoro', 
-            'Mopti', 'Sikasso', 'Ségou', 'Tombouctou'
+            'Mopti', 'Sikasso', 'Tombouctou'
         ],
         "subnational_slugs": {
             "District de Bamako": "district_de_bamako",
@@ -1073,7 +1073,6 @@ COUNTRY_CONFIGS: dict = {
             "Koulikoro": "koulikoro",
             "Mopti": "mopti",
             "Sikasso": "sikasso",
-            "Ségou": "sego",
             "Tombouctou": "tombouctou"
         },
 
@@ -1575,6 +1574,106 @@ COUNTRY_CONFIGS: dict = {
         "results_suffix_map": {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"},
         "country_results_template":      "lgu_accessibility_results_ssd_{suffix}",
         "province_results_template":     "lgu_accessibility_results_ssd_{slug}_province_{suffix}",
+    },
+
+    "romania": {
+        # ── Display ───────────────────────────────────────────────────────────
+        "display_name":     "Romania",
+        "iso3":             "rou",
+
+        # ── Map defaults ──────────────────────────────────────────────────────
+        # Romania spans roughly 43°N–48°N, 20°E–29°E
+        "center_lat":       45.94,
+        "center_lon":       24.96,
+        "map_zoom":         5.0,
+        "province_zoom":    6.0,
+
+        # ── Population (2025 World Bank estimate) ─────────────────────────────
+        "population":       19_020_271,
+
+        # ── Databricks catalog / schema ───────────────────────────────────────
+        # Set ROMANIA_CATALOG, ROMANIA_FACILITIES_SCHEMA, ROMANIA_RESULTS_SCHEMA
+        # as env vars on Posit Connect before enabling this country.
+        "catalog_env":               "ROMANIA_CATALOG",
+        "catalog_default":           "prd_mega",
+        "facilities_schema_env":     "ROMANIA_FACILITIES_SCHEMA",
+        "facilities_schema_default": "sgpbpi163",
+        "results_schema_env":        "ROMANIA_RESULTS_SCHEMA",
+        "results_schema_default":    "sgpbpi163",
+
+        # ── Sub-national administrative units ─────────────────────────────────
+        # Romania has 42 counties; using the county-level granularity here.
+        "subnational_label": "Countie",
+        "subnational_units": [
+            'Alba', 'Arad', 'Argeş', 'Bacău', 'Bihor', 'Bistriţa-Năsaud', 'Botoşani', 
+            'Braşov', 'Brăila', 'Bucureşti', 'Buzău', 'Caraş-Severin', 'Cluj', 'Constanţa', 
+            'Covasna', 'Călăraşi', 'Dolj', 'Dâmboviţa', 'Galaţi', 'Giurgiu', 'Gori', 
+            'Harghita', 'Hunedoara',  'Iaşi', 'Ilfov', 'Maramureş', 'Mehedinţi', 'Mureş', 
+            'Neamţ', 'Olt', 'Prahova', 'Satu Mare', 'Sibiu', 'Suceava', 'Sălaj', 'Teleorman', 
+            'Timiş', 'Tulcea', 'Vaslui', 'Vrancea', 'Vâlcea'
+        ],
+        "subnational_slugs": {
+            "Alba": "alba",
+            "Arad": "arad",
+            "Argeş": "arges",
+            "Bacău": "bacau",
+            "Bihor": "bihor",
+            "Bistriţa-Năsaud": "bistrita_nasaud",
+            "Botoşani": "botosani",
+            "Braşov": "brasov",
+            "Brăila": "braila",
+            "Bucureşti": "bucuresti",
+            "Buzău": "buzau",
+            "Caraş-Severin": "caras_severin",
+            "Cluj": "cluj",
+            "Constanţa": "constanta",
+            "Covasna": "covasna",
+            "Călăraşi": "calarasi",
+            "Dolj": "dolj",
+            "Dâmboviţa": "dambovita",
+            "Galaţi": "galati",
+            "Giurgiu": "giurgiu",
+            "Gorj": "gorj",
+            "Harghita": "harghita",
+            "Hunedoara": "hunedoara",
+            "Iaşi": "iasi",
+            "Ilfov": "ilfov",
+            "Maramureş": "maramures",
+            "Mehedinţi": "mehedinti",
+            "Mureş": "mures",
+            "Neamţ": "neamt",
+            "Olt": "olt",
+            "Prahova": "prahova",
+            "Satu Mare": "satu_mare",
+            "Sibiu": "sibiu",
+            "Suceava": "suceava",
+            "Sălaj": "salaj",
+            "Teleorman": "teleorman",
+            "Timiş": "timis",
+            "Tulcea": "tulcea",
+            "Vaslui": "vaslui",
+            "Vrancea": "vrancea",
+            "Vâlcea": "valcea",
+        },
+        # ── Distance bands (same convention as Zambia) ────────────────────────
+        "distance_km_map": {5: 5, 10: 10, "30min": 2, "1hr": 4},
+
+        # ── Hardcoded baseline fallbacks ──────────────────────────────────────
+        "fallback_baselines": {
+            5:       0.0,
+            10:      0.0,
+            "30min": 0.0,
+            "1hr":   0.0,
+        },
+
+        # ── Table naming conventions ──────────────────────────────────────────
+        "db_country_name":               "Romania",
+        "base_table":                    "base_dashboard_data_rou",
+        "country_facilities_table":      "health_facilities_rou_osm",
+        "province_facilities_template":  "health_facilities_rou_osm_{slug}_province",
+        "results_suffix_map": {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"},
+        "country_results_template":      "lgu_accessibility_results_rou_{suffix}",
+        "province_results_template":     "lgu_accessibility_results_rou_{slug}_province_{suffix}",
     },
     
     
