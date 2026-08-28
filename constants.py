@@ -1818,7 +1818,86 @@ COUNTRY_CONFIGS: dict = {
         "country_results_template":      "lgu_accessibility_results_pse_{suffix}",
         "province_results_template":     "lgu_accessibility_results_pse_{slug}_province_{suffix}",
     },
+
+    "yeman": {
+            # ── Display ───────────────────────────────────────────────────────────
+            "display_name":     "Republic of Yemen",
+            "iso3":             "yem",
     
+            # ── Map defaults ──────────────────────────────────────────────────────
+            # Yeman spans roughly 12°N–19°N, 42°E–55°E
+            "center_lat":       15.5,
+            "center_lon":       48.5,
+            "map_zoom":         5.0,
+            "province_zoom":    6.0,
+    
+            # ── Population (2025 World Bank estimate) ─────────────────────────────
+            "population":       41_773_878,
+    
+            # ── Databricks catalog / schema ───────────────────────────────────────
+            # Set YEMAN_CATALOG, YEMAN_FACILITIES_SCHEMA, YEMAN_RESULTS_SCHEMA
+            # as env vars on Posit Connect before enabling this country.
+            "catalog_env":               "YEMAN_CATALOG",
+            "catalog_default":           "prd_mega",
+            "facilities_schema_env":     "YEMAN_FACILITIES_SCHEMA",
+            "facilities_schema_default": "sgpbpi163",
+            "results_schema_env":        "YEMAN_RESULTS_SCHEMA",
+            "results_schema_default":    "sgpbpi163",
+    
+            # ── Sub-national administrative units ─────────────────────────────────
+            # Syria has 15 governorates; using the governorate-level granularity here.
+            "subnational_label": "Governorate",
+            "subnational_units": [
+                    "Abyan", "Al Bayda'", "Al Dali'", "Al Hudaydah", "Al Jawf", "Al Mahrah", 
+                    "Al Mahwit", "Amran", "Dhamar", "Hadramawt", "Hajjah", "Ibb", "Lahij", "Ma'rib", "Raymah", "Sa`dah", 
+                    "San`a'", "San`a' [City]", "Shabwah", "Socotra", "Ta`izz", "`Adan"
+            ],
+            "subnational_slugs": {
+                "Abyan": "abyan",
+                "Al Bayda'": "al_bayda",
+                "Al Dali'": "al_dali",
+                "Al Hudaydah": "al_hudaydah",
+                "Al Jawf": "al_jawf",
+                "Al Mahrah": "al_mahrah",
+                "Al Mahwit": "al_mahwit",
+                "Amran": "amran",
+                "Dhamar": "dhamar",
+                "Hadramawt": "hadramawt",
+                "Hajjah": "hajjah",
+                "Ibb": "ibb",
+                "Lahij": "lahij",
+                "Ma'rib": "ma_rib",
+                "Raymah": "raymah",
+                "Sa`dah": "sa_dah",
+                "San`a'": "san_a",
+                "San`a' [City]": "san_a_city",
+                "Shabwah": "shabwah",
+                "Socotra": "socotra",
+                "Ta`izz": "ta_izz",
+                "`Adan": "adan"
+            },
+    
+            # ── Distance bands (same convention as Zambia) ────────────────────────
+            "distance_km_map": {5: 5, 10: 10, "30min": 2, "1hr": 4},
+    
+            # ── Hardcoded baseline fallbacks ──────────────────────────────────────
+            "fallback_baselines": {
+                5:       97.47,
+                10:      100.00,
+                "30min": 96.93,
+                "1hr":   100,
+            },
+    
+            # ── Table naming conventions ──────────────────────────────────────────
+            "db_country_name":               "Republic of Yemen",
+            "base_table":                    "base_dashboard_data_yem",
+            "country_facilities_table":      "health_facilities_yem_osm",
+            "province_facilities_template":  "health_facilities_yem_osm_{slug}_province",
+            "results_suffix_map": {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"},
+            "country_results_template":      "lgu_accessibility_results_yem_{suffix}",
+            "province_results_template":     "lgu_accessibility_results_yem_{slug}_province_{suffix}",
+        },
+        
     
 
 

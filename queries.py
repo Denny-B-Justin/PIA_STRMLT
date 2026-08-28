@@ -295,10 +295,10 @@ class QueryService:
             default_zoom    = cfg["map_zoom"]
         else:
             # Escape single quotes defensively
-            safe_province   = loc.replace("'", "''")
-            province_clause = f"province = '{safe_province}'"
+            safe_province   = loc   #.replace("'", "''")
+            province_clause = f'province = "{safe_province}"'
             if country.lower() == "malawi":
-                province_clause = f"province = '{safe_province} Region'"
+                province_clause = f'province = "{safe_province} Region"'
             default_zoom    = cfg["province_zoom"]
 
         if country == "cote_d_ivoire":
