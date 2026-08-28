@@ -1898,9 +1898,71 @@ COUNTRY_CONFIGS: dict = {
             "province_results_template":     "lgu_accessibility_results_yem_{slug}_province_{suffix}",
         },
         
+    "haiti": {
+        # ── Display ───────────────────────────────────────────────────────────
+        "display_name":     "Haiti",
+        "iso3":             "hti",
+
+        # ── Map defaults ──────────────────────────────────────────────────────
+        # Haiti spans roughly 18°N–20°N, 71°W–75°W
+        "center_lat":       18.5,
+        "center_lon":       73.0,
+        "map_zoom":         7.0,
+        "province_zoom":    8.0,
+
+        # ── Population (2025 World Bank estimate) ─────────────────────────────
+        "population":       11_906_095, #
+
+        # ── Databricks catalog / schema ───────────────────────────────────────
+        # Set HAITI_CATALOG, HAITI_FACILITIES_SCHEMA, HAITI_RESULTS_SCHEMA
+        # as env vars on Posit Connect before enabling this country.
+        "catalog_env":               "HAITI_CATALOG",
+        "catalog_default":           "prd_mega",
+        "facilities_schema_env":     "HAITI_FACILITIES_SCHEMA",
+        "facilities_schema_default": "sgpbpi163",
+        "results_schema_env":        "HAITI_RESULTS_SCHEMA",
+        "results_schema_default":    "sgpbpi163",
+
+        # ── Sub-national administrative units ─────────────────────────────────
+        # Haiti has 10 departments; using the department-level granularity here.
+        "subnational_label": "Department",
+        "subnational_units": [
+                'Artibonite', 'Centre', 'Grand-Anse', 'Nippes', 'Nord', 'Nord-Est', 'Nord-Ouest', 'Ouest', 'Sud', 'Sud-Est'
+        ],
+        "subnational_slugs": {
+            "Artibonite": "artibonite",
+            "Centre": "centre",
+            "Grand-Anse": "grand_anse",
+            "Nippes": "nippes",
+            "Nord": "nord",
+            "Nord-Est": "nord_est",
+            "Nord-Ouest": "nord_ouest",
+            "Ouest": "ouest",
+            "Sud": "sud",
+            "Sud-Est": "sud_est"
+        },
+
+        # ── Distance bands (same convention as Zambia) ────────────────────────
+        "distance_km_map": {5: 5, 10: 10, "30min": 2, "1hr": 4},
+
+        # ── Hardcoded baseline fallbacks ──────────────────────────────────────
+        "fallback_baselines": {
+            5:       99.17,
+            10:      100,
+            "30min": 83.57,
+            "1hr":   97.40,
+        },
+
+        # ── Table naming conventions ──────────────────────────────────────────
+        "db_country_name":               "Haiti",
+        "base_table":                    "base_dashboard_data_hti",
+        "country_facilities_table":      "health_facilities_hti_osm",
+        "province_facilities_template":  "health_facilities_hti_osm_{slug}_province",
+        "results_suffix_map": {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"},
+        "country_results_template":      "lgu_accessibility_results_hti_{suffix}",
+        "province_results_template":     "lgu_accessibility_results_hti_{slug}_province_{suffix}",
+    },
     
-
-
 }
     
 
