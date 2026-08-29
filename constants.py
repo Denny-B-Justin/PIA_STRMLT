@@ -1964,73 +1964,132 @@ COUNTRY_CONFIGS: dict = {
     },
 
     "benin": {
-            # ── Display ───────────────────────────────────────────────────────────
-            "display_name":     "Benin",
-            "iso3":             "ben",
-    
-            # ── Map defaults ──────────────────────────────────────────────────────
-            # Benin spans roughly 18°N–20°N, 71°W–75°W
-            "center_lat":       18.5,
-            "center_lon":       73.0,
-            "map_zoom":         6.0,
-            "province_zoom":    7.0,
-    
-            # ── Population (2025 World Bank estimate) ─────────────────────────────
-            "population":       14_814_460, #
-    
-            # ── Databricks catalog / schema ───────────────────────────────────────
-            # Set BENIN_CATALOG, BENIN_FACILITIES_SCHEMA, BENIN_RESULTS_SCHEMA
-            # as env vars on Posit Connect before enabling this country.
-            "catalog_env":               "BENIN_CATALOG",
-            "catalog_default":           "prd_mega",
-            "facilities_schema_env":     "BENIN_FACILITIES_SCHEMA",
-            "facilities_schema_default": "sgpbpi163",
-            "results_schema_env":        "BENIN_RESULTS_SCHEMA",
-            "results_schema_default":    "sgpbpi163",
-    
-            # ── Sub-national administrative units ─────────────────────────────────
-            # Benin has 10 departments; using the department-level granularity here.
-            "subnational_label": "Department",
-            "subnational_units": [
-                    'Alibori', 'Atacora', 'Atlantique', 'Borgou', 'Collines', 
-                    'Couffo', 'Donga', 'Littoral', 'Mono', 'Oueme', 'Plateau', 
-                    'Zou'
-            ],
-            "subnational_slugs": {
-                "Alibori": "alibori",
-                "Atacora": "atacora",
-                "Atlantique": "atlantique",
-                "Borgou": "borgou",
-                "Collines": "collines",
-                "Couffo": "couffo",
-                "Donga": "donga",
-                "Littoral": "littoral",
-                "Mono": "mono",
-                "Oueme": "oueme",
-                "Plateau": "plateau",
-                "Zou": "zou"
-            },
-    
-            # ── Distance bands (same convention as Zambia) ────────────────────────
-            "distance_km_map": {5: 5, 10: 10, "30min": 2, "1hr": 4},
-    
-            # ── Hardcoded baseline fallbacks ──────────────────────────────────────
-            "fallback_baselines": {
-                5:       66.49,
-                10:      100,
-                "30min": 83.57,
-                "1hr":   97.40,
-            },
-    
-            # ── Table naming conventions ──────────────────────────────────────────
-            "db_country_name":               "Benin",
-            "base_table":                    "base_dashboard_data_ben",
-            "country_facilities_table":      "health_facilities_ben_osm",
-            "province_facilities_template":  "health_facilities_ben_osm_{slug}_province",
-            "results_suffix_map": {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"},
-            "country_results_template":      "lgu_accessibility_results_ben_{suffix}",
-            "province_results_template":     "lgu_accessibility_results_ben_{slug}_province_{suffix}",
+        # ── Display ───────────────────────────────────────────────────────────
+        "display_name":     "Benin",
+        "iso3":             "ben",
+
+        # ── Map defaults ──────────────────────────────────────────────────────
+        # Benin spans roughly 18°N–20°N, 71°W–75°W
+        "center_lat":       18.5,
+        "center_lon":       73.0,
+        "map_zoom":         6.0,
+        "province_zoom":    7.0,
+
+        # ── Population (2025 World Bank estimate) ─────────────────────────────
+        "population":       14_814_460, #
+
+        # ── Databricks catalog / schema ───────────────────────────────────────
+        # Set BENIN_CATALOG, BENIN_FACILITIES_SCHEMA, BENIN_RESULTS_SCHEMA
+        # as env vars on Posit Connect before enabling this country.
+        "catalog_env":               "BENIN_CATALOG",
+        "catalog_default":           "prd_mega",
+        "facilities_schema_env":     "BENIN_FACILITIES_SCHEMA",
+        "facilities_schema_default": "sgpbpi163",
+        "results_schema_env":        "BENIN_RESULTS_SCHEMA",
+        "results_schema_default":    "sgpbpi163",
+
+        # ── Sub-national administrative units ─────────────────────────────────
+        # Benin has 10 departments; using the department-level granularity here.
+        "subnational_label": "Department",
+        "subnational_units": [
+                'Alibori', 'Atacora', 'Atlantique', 'Borgou', 'Collines', 
+                'Couffo', 'Donga', 'Littoral', 'Mono', 'Oueme', 'Plateau', 
+                'Zou'
+        ],
+        "subnational_slugs": {
+            "Alibori": "alibori",
+            "Atacora": "atacora",
+            "Atlantique": "atlantique",
+            "Borgou": "borgou",
+            "Collines": "collines",
+            "Couffo": "couffo",
+            "Donga": "donga",
+            "Littoral": "littoral",
+            "Mono": "mono",
+            "Oueme": "oueme",
+            "Plateau": "plateau",
+            "Zou": "zou"
         },
+
+        # ── Distance bands (same convention as Zambia) ────────────────────────
+        "distance_km_map": {5: 5, 10: 10, "30min": 2, "1hr": 4},
+
+        # ── Hardcoded baseline fallbacks ──────────────────────────────────────
+        "fallback_baselines": {
+            5:       66.49,
+            10:      100,
+            "30min": 83.57,
+            "1hr":   97.40,
+        },
+
+        # ── Table naming conventions ──────────────────────────────────────────
+        "db_country_name":               "Benin",
+        "base_table":                    "base_dashboard_data_ben",
+        "country_facilities_table":      "health_facilities_ben_osm",
+        "province_facilities_template":  "health_facilities_ben_osm_{slug}_province",
+        "results_suffix_map": {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"},
+        "country_results_template":      "lgu_accessibility_results_ben_{suffix}",
+        "province_results_template":     "lgu_accessibility_results_ben_{slug}_province_{suffix}",
+    },
+
+    "djibouti": {
+        # ── Display ───────────────────────────────────────────────────────────
+        "display_name":     "Djibouti",
+        "iso3":             "dji",
+
+        # ── Map defaults ──────────────────────────────────────────────────────
+        # Djibouti spans roughly 11°N–22°N, 42°E–47°E
+        "center_lat":       16.5,
+        "center_lon":       45.0,
+        "map_zoom":         6.0,
+        "province_zoom":    7.0,
+
+        # ── Population (2025 World Bank estimate) ─────────────────────────────
+        "population":       1_184_076, #
+
+        # ── Databricks catalog / schema ───────────────────────────────────────
+        # Set DJIBOUTI_CATALOG, DJIBOUTI_FACILITIES_SCHEMA, DJIBOUTI_RESULTS_SCHEMA
+        # as env vars on Posit Connect before enabling this country.
+        "catalog_env":               "DJIBOUTI_CATALOG",
+        "catalog_default":           "prd_mega",
+        "facilities_schema_env":     "DJIBOUTI_FACILITIES_SCHEMA",
+        "facilities_schema_default": "sgpbpi163",
+        "results_schema_env":        "DJIBOUTI_RESULTS_SCHEMA",
+        "results_schema_default":    "sgpbpi163",
+
+        # ── Sub-national administrative units ─────────────────────────────────
+        # Djibouti has 10 departments; using the department-level granularity here.
+        "subnational_label": "Region",
+        "subnational_units": [
+                'Ali Sabieh', 'Jibuti',
+        ],
+        "subnational_slugs": {
+            "Ali Sabieh": "ali_sabieh",
+            "Jibuti": "jibuti"
+        },
+
+        # ── Distance bands (same convention as Zambia) ────────────────────────
+        "distance_km_map": {5: 5, 10: 10, "30min": 2, "1hr": 4},
+
+        # ── Hardcoded baseline fallbacks ──────────────────────────────────────
+        "fallback_baselines": {
+            5:       76.77,
+            10:      0.00,
+            "30min": 0.00,
+            "1hr":   0.00,
+        },
+
+        # ── Table naming conventions ──────────────────────────────────────────
+        "db_country_name":               "Djibouti",
+        "base_table":                    "base_dashboard_data_dji",
+        "country_facilities_table":      "health_facilities_dji_osm",
+        "province_facilities_template":  "health_facilities_dji_osm_{slug}_province",
+        "results_suffix_map": {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"},
+        "country_results_template":      "lgu_accessibility_results_dji_{suffix}",
+        "province_results_template":     "lgu_accessibility_results_dji_{slug}_province_{suffix}",
+    },
+
+
        
     
 }
