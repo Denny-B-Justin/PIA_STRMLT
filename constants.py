@@ -2089,7 +2089,62 @@ COUNTRY_CONFIGS: dict = {
         "province_results_template":     "lgu_accessibility_results_dji_{slug}_province_{suffix}",
     },
 
+    "equatorial_guinea": {
+        # ── Display ───────────────────────────────────────────────────────────
+        "display_name":     "Equatorial Guinea",
+        "iso3":             "gnq",
 
+        # ── Map defaults ──────────────────────────────────────────────────────
+        # Equatorial Guinea spans roughly 1°N–4°N, 9°E–14°E
+        "center_lat":       2.5,
+        "center_lon":       11.5,
+        "map_zoom":         7.0,
+        "province_zoom":    8.0,
+
+        # ── Population (2025 World Bank estimate) ─────────────────────────────
+        "population":       1_938_431, #
+
+        # ── Databricks catalog / schema ───────────────────────────────────────
+        # Set EQUATORIAL_GUINEA_CATALOG, EQUATORIAL_GUINEA_FACILITIES_SCHEMA, EQUATORIAL_GUINEA_RESULTS_SCHEMA
+        # as env vars on Posit Connect before enabling this country.
+        "catalog_env":               "EQUATORIAL_GUINEA_CATALOG",
+        "catalog_default":           "prd_mega",
+        "facilities_schema_env":     "EQUATORIAL_GUINEA_FACILITIES_SCHEMA",
+        "facilities_schema_default": "sgpbpi163",
+        "results_schema_env":        "EQUATORIAL_GUINEA_RESULTS_SCHEMA",
+        "results_schema_default":    "sgpbpi163",
+
+        # ── Sub-national administrative units ─────────────────────────────────
+        # Equatorial Guinea has 10 departments; using the department-level granularity here.
+        "subnational_label": "Province",
+        "subnational_units": [
+                'Bioko Norte', 'Litoral'
+        ],
+        "subnational_slugs": {
+            "Bioko Norte": "bioko_norte",
+            "Litoral": "litoral"
+        },
+
+        # ── Distance bands (same convention as Zambia) ────────────────────────
+        "distance_km_map": {5: 5, 10: 10, "30min": 2, "1hr": 4},
+
+        # ── Hardcoded baseline fallbacks ──────────────────────────────────────
+        "fallback_baselines": {
+            5:       51.13,
+            10:      0.00,
+            "30min": 0.00,
+            "1hr":   0.00,
+        },
+
+        # ── Table naming conventions ──────────────────────────────────────────
+        "db_country_name":               "Equatorial Guinea",
+        "base_table":                    "base_dashboard_data_gnq",
+        "country_facilities_table":      "health_facilities_gnq_osm",
+        "province_facilities_template":  "health_facilities_gnq_osm_{slug}_province",
+        "results_suffix_map": {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"},
+        "country_results_template":      "lgu_accessibility_results_gnq_{suffix}",
+        "province_results_template":     "lgu_accessibility_results_gnq_{slug}_province_{suffix}",
+    },
        
     
 }
