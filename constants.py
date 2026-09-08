@@ -2145,6 +2145,81 @@ COUNTRY_CONFIGS: dict = {
         "country_results_template":      "lgu_accessibility_results_gnq_{suffix}",
         "province_results_template":     "lgu_accessibility_results_gnq_{slug}_province_{suffix}",
     },
+
+    "laos": {
+        # ── Display ───────────────────────────────────────────────────────────
+        "display_name":     "Laos",
+        "iso3":             "lao",
+
+        # ── Map defaults ──────────────────────────────────────────────────────
+        # Laos spans roughly 5°N–22°N, 99°E–108°E
+        "center_lat":       13.5,
+        "center_lon":       102.5,
+        "map_zoom":         5.5,
+        "province_zoom":    7.0,
+
+        # ── Population (2025 World Bank estimate) ─────────────────────────────
+        "population":       7_873_046, #
+
+        # ── Databricks catalog / schema ───────────────────────────────────────
+        # Set LAOS_CATALOG, LAOS_FACILITIES_SCHEMA, LAOS_RESULTS_SCHEMA
+        # as env vars on Posit Connect before enabling this country.
+        "catalog_env":               "LAOS_CATALOG",
+        "catalog_default":           "prd_mega",
+        "facilities_schema_env":     "LAOS_FACILITIES_SCHEMA",
+        "facilities_schema_default": "sgpbpi163",
+        "results_schema_env":        "LAOS_RESULTS_SCHEMA",
+        "results_schema_default":    "sgpbpi163",
+
+        # ── Sub-national administrative units ─────────────────────────────────
+        # Laos has 18 provinces; using the province-level granularity here.
+        "subnational_label": "Province",
+        "subnational_units": [
+                'Attapu', 'Bokeo', 'Bolikhamxai', 'Champasak', 'Houaphan', 'Khammouan', 'Louang Namtha', 'Louangphrabang', 
+                'Oudômxai', 'Phôngsali', 'Saravan', 'Savannakhét', 'Vientiane', 'Vientiane [prefecture]', 'Xaignabouri', 
+                'Xaisômboun', 'Xiangkhoang', 'Xékong'
+        ],
+        "subnational_slugs": {
+            "Attapu": "attapu",
+            "Bokeo": "bokeo",
+            "Bolikhamxai": "bolikhamxai",
+            "Champasak": "champasak",
+            "Houaphan": "houaphan",
+            "Khammouan": "khammouan",
+            "Louang Namtha": "louang_namtha",
+            "Louangphrabang": "louangphrabang",
+            "Oudômxai": "oudomxai",
+            "Phôngsali": "phongsali",
+            "Saravan": "saravan",
+            "Savannakhét": "savannakhet",
+            "Vientiane": "vientiane",
+            "Vientiane [prefecture]": "vientiane_prefecture",
+            "Xaignabouri": "xaignabouri",
+            "Xaisômboun": "xaisomboun",
+            "Xiangkhoang": "xiangkhoang",
+            "Xékong": "xekong"
+        },
+
+        # ── Distance bands (same convention as Zambia) ────────────────────────
+        "distance_km_map": {5: 5, 10: 10, "30min": 2, "1hr": 4},
+
+        # ── Hardcoded baseline fallbacks ──────────────────────────────────────
+        "fallback_baselines": {
+            5:       78.69,
+            10:      0.00,
+            "30min": 0.00,
+            "1hr":   0.00,
+        },
+
+        # ── Table naming conventions ──────────────────────────────────────────
+        "db_country_name":               "Laos",
+        "base_table":                    "base_dashboard_data_lao",
+        "country_facilities_table":      "health_facilities_lao_osm",
+        "province_facilities_template":  "health_facilities_lao_osm_{slug}_province",
+        "results_suffix_map": {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"},
+        "country_results_template":      "lgu_accessibility_results_lao_{suffix}",
+        "province_results_template":     "lgu_accessibility_results_lao_{slug}_province_{suffix}",
+    },
        
     
 }
