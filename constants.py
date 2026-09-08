@@ -2220,6 +2220,66 @@ COUNTRY_CONFIGS: dict = {
         "country_results_template":      "lgu_accessibility_results_lao_{suffix}",
         "province_results_template":     "lgu_accessibility_results_lao_{slug}_province_{suffix}",
     },
+
+    "togo": {
+        # ── Display ───────────────────────────────────────────────────────────
+        "display_name":     "Togo",
+        "iso3":             "tgo",
+
+        # ── Map defaults ──────────────────────────────────────────────────────
+        # Togo spans roughly 5°N–11°N, 0°E–2°E
+        "center_lat":       8.6,
+        "center_lon":       0.8,
+        "map_zoom":         6.0,
+        "province_zoom":    7.0,
+
+        # ── Population (2025 World Bank estimate) ─────────────────────────────
+        "population":       8_591_626, #
+
+        # ── Databricks catalog / schema ───────────────────────────────────────
+        # Set TOGO_CATALOG, TOGO_FACILITIES_SCHEMA, TOGO_RESULTS_SCHEMA
+        # as env vars on Posit Connect before enabling this country.
+        "catalog_env":               "TOGO_CATALOG",
+        "catalog_default":           "prd_mega",
+        "facilities_schema_env":     "TOGO_FACILITIES_SCHEMA",
+        "facilities_schema_default": "sgpbpi163",
+        "results_schema_env":        "TOGO_RESULTS_SCHEMA",
+        "results_schema_default":    "sgpbpi163",
+
+        # ── Sub-national administrative units ─────────────────────────────────
+        # Togo has 18 provinces; using the province-level granularity here.
+        "subnational_label": "Region",
+        "subnational_units": [
+                'Centrale', 'Kara', 'Maritime', 'Plateaux', 'Savanes'
+        ],
+        "subnational_slugs": {
+            "Centrale": "centrale",
+            "Kara": "kara",
+            "Maritime": "maritime",
+            "Plateaux": "plateaux",
+            "Savanes": "savanes"
+        },
+
+        # ── Distance bands (same convention as Zambia) ────────────────────────
+        "distance_km_map": {5: 5, 10: 10, "30min": 2, "1hr": 4},
+
+        # ── Hardcoded baseline fallbacks ──────────────────────────────────────
+        "fallback_baselines": {
+            5:       82.67,
+            10:      0.00,
+            "30min": 0.00,
+            "1hr":   0.00,
+        },
+
+        # ── Table naming conventions ──────────────────────────────────────────
+        "db_country_name":               "Togo",
+        "base_table":                    "base_dashboard_data_tgo",
+        "country_facilities_table":      "health_facilities_tgo_osm",
+        "province_facilities_template":  "health_facilities_tgo_osm_{slug}_province",
+        "results_suffix_map": {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"},
+        "country_results_template":      "lgu_accessibility_results_tgo_{suffix}",
+        "province_results_template":     "lgu_accessibility_results_tgo_{slug}_province_{suffix}",
+    },
        
     
 }
