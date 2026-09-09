@@ -2280,7 +2280,80 @@ COUNTRY_CONFIGS: dict = {
         "country_results_template":      "lgu_accessibility_results_tgo_{suffix}",
         "province_results_template":     "lgu_accessibility_results_tgo_{slug}_province_{suffix}",
     },
-       
+
+    "senegal": {
+        # ── Display ───────────────────────────────────────────────────────────
+        "display_name":     "Senegal",
+        "iso3":             "sen",
+
+        # ── Map defaults ──────────────────────────────────────────────────────
+        # Senegal spans roughly 5°N–11°N, 0°E–2°E
+        "center_lat":       14.5,
+        "center_lon":       -14.46,
+        "map_zoom":         6.0,
+        "province_zoom":    7.0,
+
+        # ── Population (2025 World Bank estimate) ─────────────────────────────
+        "population":       18_931_966, #
+
+        # ── Databricks catalog / schema ───────────────────────────────────────
+        # Set SENEGAL_CATALOG, SENEGAL_FACILITIES_SCHEMA, SENEGAL_RESULTS_SCHEMA
+        # as env vars on Posit Connect before enabling this country.
+        "catalog_env":               "SENEGAL_CATALOG",
+        "catalog_default":           "prd_mega",
+        "facilities_schema_env":     "SENEGAL_FACILITIES_SCHEMA",
+        "facilities_schema_default": "sgpbpi163",
+        "results_schema_env":        "SENEGAL_RESULTS_SCHEMA",
+        "results_schema_default":    "sgpbpi163",
+
+        # ── Sub-national administrative units ─────────────────────────────────
+        # Senegal has 18 provinces; using the province-level granularity here.
+        "subnational_label": "Region",
+        "subnational_units": [
+                'Dakar', 'Diourbel', 'Fatick', 'Kaffrine', 'Kaolack', 'Kolda', 'Kédougou', 'Louga', 'Matam', 'Saint Louis', 
+                'Sédhiou', 'Tambacounda', 'Thiès', 'Ziguinchor'
+        ],
+        "subnational_slugs": {
+            "Dakar": "dakar",
+            "Diourbel": "diourbel",
+            "Fatick": "fatick",
+            "Kaffrine": "kaffrine",
+            "Kaolack": "kaolack",
+            "Kolda": "kolda",
+            "Kédougou": "kedougou",
+            "Louga": "louga",
+            "Matam": "matam",
+            "Saint Louis": "saint_louis",
+            "Sédhiou": "sedhiou",
+            "Tambacounda": "tambacounda",
+            "Thiès": "thies",
+            "Ziguinchor": "ziguinchor"
+        },
+
+        # ── Distance bands (same convention as Zambia) ────────────────────────
+        "distance_km_map": {5: 5, 10: 10, "30min": 2, "1hr": 4},
+
+        # ── Hardcoded baseline fallbacks ──────────────────────────────────────
+        "fallback_baselines": {
+            5:       68.77,
+            10:      0.00,
+            "30min": 0.00,
+            "1hr":   0.00
+        },
+
+        # ── Distance bands (same convention as Zambia) ────────────────────────
+        "distance_km_map": {5: 5, 10: 10, "30min": 2, "1hr": 4},
+
+        # ── Table naming conventions ──────────────────────────────────────────
+        "db_country_name":               "Senegal",
+        "base_table":                    "base_dashboard_data_sen",
+        "country_facilities_table":      "health_facilities_sen_osm",
+        "province_facilities_template":  "health_facilities_sen_osm_{slug}_province",
+        "results_suffix_map": {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"},
+        "country_results_template":      "lgu_accessibility_results_sen_{suffix}",
+        "province_results_template":     "lgu_accessibility_results_sen_{slug}_province_{suffix}",
+    },
+           
     
 }
     
