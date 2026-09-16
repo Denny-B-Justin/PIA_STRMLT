@@ -22,8 +22,8 @@ except ImportError:
     logging.warning("python-dotenv not installed — reading env vars from system only")
 
 # ── Backward-compat module-level catalog / schema constants ───────────────────
-# These are kept so that get_user_credentials / get_gadm_boundary_wkt (which
-# are Zambia-only helpers) continue to resolve the correct tables.
+# These are kept so that get_user_credentials (a Zambia-only helper)
+# continues to resolve the correct tables.
 # Country-aware methods resolve their own catalog / schema via _get_catalog() etc.
 
 ZAMBIA_CATALOG    = os.getenv("ZAMBIA_CATALOG",    "prd_mega")
@@ -439,23 +439,3 @@ class QueryService:
         """
         df = self.execute_query(query)
         return dict(zip(df["username"], df["password_hash"]))
-
-    def get_gadm_boundary_wkt(self) -> Optional[str]:
-        """
-        Return the Zambia national boundary geometry as a WKT string.
-        Kept for backward compatibility; prefer get_base_dashboard_data().
-        """
-        query = f"""
-            SELECT geometry_wkt
-            FROM {ZAMBIA_CATALOG}.{FACILITIES_SCHEMA}.gadm_boundaries_zmb
-            LIMIT 1
-        """
-        df = self.execute_query(query)
-        if df.empty:
-            logging.warning("gadm_boundaries_zmb returned no rows")
-            return None
-        val = df["geometry_wkt"].iloc[0]
-        if val is None:
-            logging.warning("gadm_boundaries_zmb geometry_wkt is NULL")
-            return None
-        return str(val)
