@@ -2212,7 +2212,9 @@ COUNTRY_CONFIGS: dict = {
         },
 
         # ── Table naming conventions ──────────────────────────────────────────
-        "db_country_name":               "Laos",
+        # Matches base_dashboard_data.country, which the pipeline writes from the
+        # official WB boundary name (NAM_0). display_name above stays "Laos" for the UI.
+        "db_country_name":               "Lao People's Democratic Republic",
         "base_table":                    "base_dashboard_data_lao",
         "country_facilities_table":      "health_facilities_lao_osm",
         "province_facilities_template":  "health_facilities_lao_osm_{slug}_province",
