@@ -2355,8 +2355,104 @@ COUNTRY_CONFIGS: dict = {
         "country_results_template":      "lgu_accessibility_results_sen_{suffix}",
         "province_results_template":     "lgu_accessibility_results_sen_{slug}_province_{suffix}",
     },
-           
+
+    "vietnam": {
+            # ── Display ───────────────────────────────────────────────────────────
+            "display_name":     "Vietnam",
+            "iso3":             "vnm",
     
+            # ── Map defaults ──────────────────────────────────────────────────────
+            # Vietnam spans roughly 8°N–23°N, 102°E–109°E
+            "center_lat":       14.5,
+            "center_lon":       106.0,
+            "map_zoom":         4.75,
+            "province_zoom":    6.0,
+    
+            # ── Population (2025 World Bank estimate) ─────────────────────────────
+            "population":       101_598_527, #
+    
+            # ── Databricks catalog / schema ───────────────────────────────────────
+            # Set VIETNAM_CATALOG, VIETNAM_FACILITIES_SCHEMA, VIETNAM_RESULTS_SCHEMA
+            # as env vars on Posit Connect before enabling this country.
+            "catalog_env":               "VIETNAM_CATALOG",
+            "catalog_default":           "prd_mega",
+            "facilities_schema_env":     "VIETNAM_FACILITIES_SCHEMA",
+            "facilities_schema_default": "sgpbpi163",
+            "results_schema_env":        "VIETNAM_RESULTS_SCHEMA",
+            "results_schema_default":    "sgpbpi163",
+    
+            # ── Sub-national administrative units ─────────────────────────────────
+            # Vietnam has 18 provinces; using the province-level granularity here.
+            "subnational_label": "Provinces and municipalitie",
+            "subnational_units": [
+                    'Thành phố Cần Thơ', 'Thành phố Huế', 'Thành phố Hà Nội', 'Thành phố Hải Phòng', 'Thành phố Hồ Chí Minh', 
+                    'Thành phố Đà Nẵng', 'Tỉnh An Giang', 'Tỉnh Bắc Ninh', 'Tỉnh Cao Bằng', 'Tỉnh Cà Mau', 'Tỉnh Gia Lai', 
+                    'Tỉnh Hà Tĩnh', 'Tỉnh Hưng Yên', 'Tỉnh Khánh Hòa', 'Tỉnh Lai Châu', 'Tỉnh Lào Cai', 'Tỉnh Lâm Đồng', 
+                    'Tỉnh Lạng Sơn', 'Tỉnh Nghệ An', 'Tỉnh Ninh Bình', 'Tỉnh Phú Thọ', 'Tỉnh Quảng Ngãi', 'Tỉnh Quảng Ninh', 
+                    'Tỉnh Quảng Trị', 'Tỉnh Sơn La', 'Tỉnh Thanh Hóa', 'Tỉnh Thái Nguyên', 'Tỉnh Tuyên Quang', 'Tỉnh Tây Ninh', 
+                    'Tỉnh Vĩnh Long', 'Tỉnh Điện Biên', 'Tỉnh Đắk Lắk', 'Tỉnh Đồng Nai', 'Tỉnh Đồng Tháp'
+            ],
+            "subnational_slugs": {
+                "Thành phố Cần Thơ": "thanh_pho_can_tho",
+                "Thành phố Huế": "thanh_pho_hue",
+                "Thành phố Hà Nội": "thanh_pho_ha_noi",
+                "Thành phố Hải Phòng": "thanh_pho_hai_phong",
+                "Thành phố Hồ Chí Minh": "thanh_pho_ho_chi_minh",
+                "Thành phố Đà Nẵng": "thanh_pho_a_nang",
+                "Tỉnh An Giang": "tinh_an_giang",
+                "Tỉnh Bắc Ninh": "tinh_bac_ninh",
+                "Tỉnh Cao Bằng": "tinh_cao_bang",
+                "Tỉnh Cà Mau": "tinh_ca_mau",
+                "Tỉnh Gia Lai": "tinh_gia_lai",
+                "Tỉnh Hà Tĩnh": "tinh_ha_tinh",
+                "Tỉnh Hưng Yên": "tinh_hung_yen",
+                "Tỉnh Khánh Hòa": "tinh_khanh_hoa",
+                "Tỉnh Lai Châu": "tinh_lai_chau",
+                "Tỉnh Lào Cai": "tinh_lao_cai",
+                "Tỉnh Lâm Đồng": "tinh_lam_ong",
+                "Tỉnh Lạng Sơn": "tinh_lang_son",
+                "Tỉnh Nghệ An": "tinh_nghe_an",
+                "Tỉnh Ninh Bình": "tinh_ninh_binh",
+                "Tỉnh Phú Thọ": "tinh_phu_tho",
+                "Tỉnh Quảng Ngãi": "tinh_quang_ngai",
+                "Tỉnh Quảng Ninh": "tinh_quang_ninh",
+                "Tỉnh Quảng Trị": "tinh_quang_tri",
+                "Tỉnh Sơn La": "tinh_son_la",
+                "Tỉnh Thanh Hóa": "tinh_thanh_hoa",
+                "Tỉnh Thái Nguyên": "tinh_thai_nguyen",
+                "Tỉnh Tuyên Quang": "tinh_tuyen_quang",
+                "Tỉnh Tây Ninh": "tinh_tay_ninh",
+                "Tỉnh Vĩnh Long": "tinh_vinh_long",
+                "Tỉnh Điện Biên": "tinh_ien_bien",
+                "Tỉnh Đắk Lắk": "tinh_ak_lak",
+                "Tỉnh Đồng Nai": "tinh_ong_nai",
+                "Tỉnh Đồng Tháp": "tinh_ong_thap"
+            },
+
+            # ── Distance bands (same convention as Zambia) ────────────────────────
+            "distance_km_map": {5: 5, 10: 10, "30min": 2, "1hr": 4},
+    
+            # ── Hardcoded baseline fallbacks ──────────────────────────────────────
+            "fallback_baselines": {
+                5:       0.00,
+                10:      0.00,
+                "30min": 67.71,
+                "1hr":   0.00
+            },
+    
+            # ── Distance bands (same convention as Zambia) ────────────────────────
+            "distance_km_map": {5: 5, 10: 10, "30min": 2, "1hr": 4},
+    
+            # ── Table naming conventions ──────────────────────────────────────────
+            "db_country_name":               "Vietnam",
+            "base_table":                    "base_dashboard_data_vnm",
+            "country_facilities_table":      "health_facilities_vnm_osm",
+            "province_facilities_template":  "health_facilities_vnm_osm_{slug}_province",
+            "results_suffix_map": {5: "5km", 10: "10km", "30min": "2km", "1hr": "4km"},
+            "country_results_template":      "lgu_accessibility_results_vnm_{suffix}",
+            "province_results_template":     "lgu_accessibility_results_vnm_{slug}_province_{suffix}",
+        },
+           
 }
     
 
