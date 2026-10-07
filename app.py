@@ -1177,8 +1177,10 @@ def render_download_table(records):
         "PARENT_PROJ_ID":           "Parent Project ID",
         "LNDNG_INSTR_LONG_NAME":    "Lending Instrument",
         "RGN_NAME":                 "Region",
+        "LEAD_GP_NAME":      "Global Practice",
+        "GPP_PROJ_LGL_NAME":    "Project Long Name",
         "PROJ_DEV_OBJECTIVE_DESC":   "Project Objective",
-        "PriorActions":   "Prior Actions",
+        "PriorActions":        "Prior Actions",
         "DLI_AMT":                  "DLI",
     }
 
