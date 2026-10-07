@@ -1178,6 +1178,7 @@ def render_download_table(records):
         "LNDNG_INSTR_LONG_NAME":    "Lending Instrument",
         "RGN_NAME":                 "Region",
         "PROJ_DEV_OBJECTIVE_DESC":   "Project Objective",
+        "PriorActions":   "Prior Actions",
         "DLI_AMT":                  "DLI",
     }
 

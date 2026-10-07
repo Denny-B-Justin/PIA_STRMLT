@@ -37,7 +37,7 @@ COL_VALID_HIER     = "Valid_Hierarchy"          # "True" / "False" (string)
 COL_COUNTRY        = "CNTRY_SHORT_NAME"
 COL_DLI            = "DLI_AMT"
 COL_CMT_AMT        = "TOT_CMT_AMT"
-# COL_DLR           = "DLR"
+COL_PA           = "PriorActions"
 COL_PARENT_PROJ_ID = "PARENT_PROJ_ID"
 COL_PROD_LINE_NAME = "PROD_LINE_NAME"
 
@@ -71,6 +71,7 @@ DOWNLOAD_COLUMNS: list[str] = [
     COL_LEND_INSTR,
     COL_REGION,
     COL_PROJ_OBJ,
+    COL_PA,
     COL_DLI,
 ]
 
